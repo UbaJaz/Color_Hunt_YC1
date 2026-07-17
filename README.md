@@ -58,4 +58,5 @@ science, no game state beyond the single `capture` screen.
   permission behavior can differ between the two. Document any difference
   found here.
 
-<!-- Add on-device test notes below after Step 13 -->
+# MVP
+>>>>>>> f1c7f1024d1abbc98e031063862f11810cf9e1fd
