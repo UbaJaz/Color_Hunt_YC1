@@ -1,0 +1,168 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <title>ColorHunt Day 2 — Browser Pipeline Test</title>
+  <style>
+    body {
+      font-family: Arial, sans-serif;
+      max-width: 1200px;
+      margin: 0 auto;
+      padding: 20px;
+    }
+    h1 {
+      text-align: center;
+    }
+    .image-selector {
+      text-align: center;
+      margin-bottom: 20px;
+    }
+    .image-selector button {
+      padding: 10px 20px;
+      margin: 0 5px;
+      cursor: pointer;
+      font-size: 14px;
+    }
+    .image-selector button.active {
+      background-color: #007bff;
+      color: white;
+    }
+    canvas {
+      border: 2px solid #333;
+      cursor: crosshair;
+      max-width: 90vw;
+      display: block;
+      margin: 0 auto;
+    }
+    .swatch {
+      width: 100px;
+      height: 100px;
+      border: 2px solid #000;
+      margin: 20px auto;
+      display: block;
+    }
+    #results {
+      margin-top: 20px;
+      font-family: monospace;
+      background: #f5f5f5;
+      padding: 15px;
+      border-radius: 5px;
+    }
+    .result-row {
+      margin: 5px 0;
+    }
+    .timing {
+      color: #666;
+      font-style: italic;
+    }
+  </style>
+</head>
+<body>
+  <h1>ColorHunt — Click anywhere on the image</h1>
+  
+  <div class="image-selector">
+    <button id="btn-red" onclick="loadImage('real-red.jpeg', 'Crimson')">Red Test Image</button>
+    <button id="btn-green" onclick="loadImage('real-green.jpeg', 'CadetBlue')">Green Test Image</button>
+    <button id="btn-blue" onclick="loadImage('real-blue.jpeg', 'RoyalBlue')">Blue Test Image</button>
+  </div>
+
+  <canvas id="gameCanvas"></canvas>
+  
+  <div id="swatch" class="swatch" style="background-color: rgb(128, 128, 128);"></div>
+  
+  <div id="results">
+    <div class="result-row">Load an image and click to extract color...</div>
+  </div>
+
+  <script type="module">
+    import { extractColorFromCanvas, rgbToLab, deltaE2000, deltaEToScore } from '../dist/browser.js';
+
+    const canvas = document.getElementById('gameCanvas');
+    const ctx = canvas.getContext('2d');
+    const resultsDiv = document.getElementById('results');
+    const swatch = document.getElementById('swatch');
+    
+    let currentTargetRgb = null;
+    let currentTargetName = null;
+
+    // Target colors for each test image
+    const targetColors = {
+      'real-red.jpeg': { rgb: { r: 220, g: 20, b: 60 }, name: 'Crimson' },
+      'real-green.jpeg': { rgb: { r: 95, g: 158, b: 160 }, name: 'CadetBlue' },
+      'real-blue.jpeg': { rgb: { r: 65, g: 105, b: 225 }, name: 'RoyalBlue' }
+    };
+
+    // Expose loadImage to global scope for button clicks
+    window.loadImage = function(imagePath, targetName) {
+      const img = new Image();
+      img.src = './test-images/' + imagePath;
+      img.onload = () => {
+        canvas.width = img.naturalWidth;
+        canvas.height = img.naturalHeight;
+        ctx.drawImage(img, 0, 0);
+        
+        // Set current target
+        currentTargetRgb = targetColors[imagePath].rgb;
+        currentTargetName = targetColors[imagePath].name;
+        
+        // Update button states
+        document.querySelectorAll('.image-selector button').forEach(btn => btn.classList.remove('active'));
+        const btnId = 'btn-' + targetName.toLowerCase().replace(/cadetblue/g, 'green').replace(/royalblue/g, 'blue').replace(/crimson/g, 'red');
+        const btn = document.getElementById(btnId);
+        if (btn) btn.classList.add('active');
+        
+        // Clear results
+        resultsDiv.innerHTML = '<div class="result-row">Image loaded. Click to extract color...</div>';
+        swatch.style.backgroundColor = 'rgb(128, 128, 128)';
+      };
+    };
+
+    canvas.addEventListener('click', (e) => {
+      console.log('[BROWSER] Canvas clicked at', e.clientX, e.clientY);
+      const rect = canvas.getBoundingClientRect();
+      const scaleX = canvas.width / rect.width;
+      const scaleY = canvas.height / rect.height;
+      const clickX = (e.clientX - rect.left) * scaleX;
+      const clickY = (e.clientY - rect.top) * scaleY;
+
+      console.time('pipeline');
+      const result = extractColorFromCanvas(canvas, clickX, clickY);
+      console.timeEnd('pipeline');
+
+      // Draw selection rectangle
+      ctx.strokeStyle = 'yellow';
+      ctx.lineWidth = 3;
+      ctx.strokeRect(result.region.x, result.region.y, result.region.width, result.region.height);
+
+      // Update swatch
+      const rgbStr = `rgb(${result.extractedRgb.r}, ${result.extractedRgb.g}, ${result.extractedRgb.b})`;
+      swatch.style.backgroundColor = rgbStr;
+
+      // Calculate score against target
+      let scoreHtml = '';
+      if (currentTargetRgb) {
+        const targetLab = rgbToLab(currentTargetRgb);
+        const deltaE = deltaE2000(result.extractedLab, targetLab);
+        const score = deltaEToScore(deltaE, 15);
+        scoreHtml = `
+          <div class="result-row"><strong>Target:</strong> ${currentTargetName} (${currentTargetRgb.r}, ${currentTargetRgb.g}, ${currentTargetRgb.b})</div>
+          <div class="result-row"><strong>Delta E:</strong> ${deltaE.toFixed(2)}</div>
+          <div class="result-row"><strong>Score:</strong> ${score.toFixed(1)}/100</div>
+        `;
+      }
+
+      // Display results
+      resultsDiv.innerHTML = `
+        <div class="result-row"><strong>Extracted RGB:</strong> (${result.extractedRgb.r}, ${result.extractedRgb.g}, ${result.extractedRgb.b})</div>
+        <div class="result-row"><strong>Extracted Lab:</strong> L=${result.extractedLab.L.toFixed(2)}, a=${result.extractedLab.a.toFixed(2)}, b=${result.extractedLab.b.toFixed(2)}</div>
+        <div class="result-row"><strong>Dominant cluster:</strong> ${result.dominantClusterSize} of ${result.totalPixelsSampled} pixels</div>
+        <div class="result-row"><strong>Region:</strong> x=${result.region.x}, y=${result.region.y}, ${result.region.width}×${result.region.height}</div>
+        ${scoreHtml}
+        <div class="result-row timing">Pipeline timing: Check browser console (F12) for milliseconds</div>
+      `;
+    });
+
+    // Load red image by default
+    window.loadImage('real-red.jpeg', 'Crimson');
+  </script>
+</body>
+</html>

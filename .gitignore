@@ -22,3 +22,10 @@ dist-ssr
 *.njsproj
 *.sln
 *.sw?
+
+# Color science module build artifacts
+packages/color-science/dist/
+packages/color-science/node_modules/
+
+*.onetoc2
+
