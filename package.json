@@ -4,8 +4,9 @@
   "version": "0.0.0",
   "type": "module",
   "scripts": {
-    "dev": "vite",
-    "build": "tsc -b && vite build",
+    "dev": "npm run build:color-science && vite",
+    "build": "npm run build:color-science && tsc -b && vite build",
+    "build:color-science": "npm install --prefix packages/color-science && npm run build --prefix packages/color-science",
     "lint": "oxlint",
     "preview": "vite preview"
   },
