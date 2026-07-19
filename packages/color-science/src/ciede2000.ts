@@ -118,20 +118,20 @@ export function deltaE2000(lab1: Lab, lab2: Lab): number {
  * - deltaE of ~5 = clearly different colors
  * - deltaE of ~10+ = very different colors
  * 
- * Using a normalization factor of 10 means:
- * - deltaE 0-2.3: score 77-100 (excellent match)
- * - deltaE 2.3-5: score 50-77 (good match)
- * - deltaE 5-10: score 0-50 (poor match)
- * - deltaE >10: score approaches 0 (very poor match)
+ * Using a normalization factor of 15 means:
+ * - deltaE 0-3.5: score 77-100 (excellent match)
+ * - deltaE 3.5-7.5: score 50-77 (good match)
+ * - deltaE 7.5-15: score 0-50 (poor match)
+ * - deltaE >15: score approaches 0 (very poor match)
  * 
  * This feels reasonable for a party game - small differences are rewarded,
  * but clearly wrong matches get low scores.
  * 
  * @param deltaE - Delta E value from CIEDE2000
- * @param normalizationFactor - Factor to normalize deltaE (default: 10)
+ * @param normalizationFactor - Factor to normalize deltaE (default: 15)
  * @returns Score from 0-100
  */
-export function deltaEToScore(deltaE: number, normalizationFactor: number = 10): number {
+export function deltaEToScore(deltaE: number, normalizationFactor: number = 15): number {
   const normalizedDeltaE = deltaE / normalizationFactor;
   const score = (1 - Math.min(normalizedDeltaE, 1)) * 100;
   return Math.max(0, Math.min(100, score));
@@ -140,7 +140,7 @@ export function deltaEToScore(deltaE: number, normalizationFactor: number = 10):
 /**
  * Calculate color match score directly from two Lab colors
  */
-export function calculateColorScore(lab1: Lab, lab2: Lab, normalizationFactor: number = 10): number {
+export function calculateColorScore(lab1: Lab, lab2: Lab, normalizationFactor: number = 15): number {
   const deltaE = deltaE2000(lab1, lab2);
   return deltaEToScore(deltaE, normalizationFactor);
 }

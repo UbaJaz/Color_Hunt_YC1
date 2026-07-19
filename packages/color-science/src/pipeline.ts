@@ -53,7 +53,7 @@ export function extractColorFromCanvas(
 
   // 4. Extract RGB pixels
   const rgbPixels = getPixelsFromRegion(imageData, 0, 0, region.width, region.height);
-  // NOTE: getPixelsFromRegion on the ImageData sub-region starts at (0,0) 
+  // NOTE: getPixelsFromRegion on the ImageData sub-region starts at (0,0)
   // because ctx.getImageData() already cropped to the region
 
   // 5. Convert to Lab

@@ -26,3 +26,7 @@ export type { Region } from './regionSelection.js';
 // High-level pipeline function (browser portable)
 export { extractColorFromCanvas } from './pipeline.js';
 export type { ExtractionResult } from './pipeline.js';
+
+// Confidence scoring (browser portable)
+export { calculateConfidence } from './confidence.js';
+export type { ConfidenceResult, ConfidenceLevel } from './confidence.js';

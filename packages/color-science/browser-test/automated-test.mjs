@@ -44,9 +44,6 @@ for (const test of testCases) {
   await page.waitForTimeout(500); // Wait for image load
   
   const start = Date.now();
-  const currentBox = await canvas.boundingBox();
-  const targetX = currentBox.x + currentBox.width / 2;
-  const targetY = currentBox.y + currentBox.height / 2;
   console.log(`Dispatching click to center of canvas`);
   // Click the center of the canvas using dispatchEvent to ensure it's caught
   await page.evaluate(() => {

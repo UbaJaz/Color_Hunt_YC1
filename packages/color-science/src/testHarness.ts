@@ -6,7 +6,7 @@ import { extractDominantColor } from './kmeans.js';
 import { rejectOutliers } from './outlierRejection.js';
 import { rgbToLab, labToRgb } from './colorConversion.js';
 import { deltaE2000, deltaEToScore } from './ciede2000.js';
-import { RGB, Lab } from './types.js';
+import { RGB } from './types.js';
 
 // Sample target colors to test against
 const targetColors: { name: string; rgb: RGB }[] = [
@@ -77,7 +77,7 @@ async function processImage(imagePath: string, objectName: string) {
     for (const target of targetColors) {
       const targetLab = rgbToLab(target.rgb);
       const deltaE = deltaE2000(finalCentroid, targetLab);
-      const score = deltaEToScore(deltaE, 15); // Using normalization factor of 10
+      const score = deltaEToScore(deltaE, 15); // Using normalization factor of 15
 
       const targetRgbStr = `(${target.rgb.r},${target.rgb.g},${target.rgb.b})`;
       console.log(`| ${target.name.padEnd(20)} | ${targetRgbStr.padEnd(18)} | ${deltaE.toFixed(2).padEnd(10)} | ${score.toFixed(1).padEnd(10)} |`);
