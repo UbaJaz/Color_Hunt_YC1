@@ -7,6 +7,7 @@ import { rgbToLab, labToRgb } from './colorConversion.js';
 import { getPixelsFromRegion } from './canvasPixels.js';
 import { selectRegion, Region } from './regionSelection.js';
 import { RGB, Lab } from './types.js';
+import { CalibrationMatrix, applyCalibration } from './calibration.js';
 
 export interface ExtractionResult {
   extractedRgb: RGB;
@@ -18,20 +19,26 @@ export interface ExtractionResult {
 
 /**
  * Full pipeline: given a canvas and a tap coordinate, extract the dominant color.
- * 
+ *
  * Steps:
  * 1. Compute sampling region via selectRegion()
  * 2. Get ImageData from the canvas context for that region
  * 3. Convert ImageData to RGB[] via getPixelsFromRegion()
- * 4. Convert RGB[] to Lab[] via rgbToLab()
- * 5. Run k-means: extractDominantColor()
- * 6. Filter outliers: rejectOutliers() on the dominant cluster pixels only
- * 7. Convert final centroid back to RGB via labToRgb()
- * 
+ * 4. Apply calibration BEFORE converting to Lab, if provided
+ * 5. Convert RGB[] to Lab[] via rgbToLab()
+ * 6. Run k-means: extractDominantColor()
+ * 7. Filter outliers: rejectOutliers() on the dominant cluster pixels only
+ * 8. Convert final centroid back to RGB via labToRgb()
+ *
  * NOTE: This function does NOT draw on the canvas. It returns the region
  * coordinates so the caller (React UI) can draw the selection rectangle.
- * 
+ *
  * NOTE: getContext('2d') can return null. Throw a clear error if it does.
+ *
+ * NOTE: Calibration is applied to raw pixels before Lab conversion. This is
+ * because white balance is a physical property of the lighting affecting every
+ * pixel in the photo, not just the final averaged result. Correcting before
+ * clustering means k-means and outlier rejection work on already-corrected data.
  */
 export function extractColorFromCanvas(
   canvas: HTMLCanvasElement,
@@ -39,7 +46,8 @@ export function extractColorFromCanvas(
   tapY: number,
   k: number = 3,
   outlierStdDevs: number = 2,
-  regionProportion: number = 0.20
+  regionProportion: number = 0.20,
+  calibration?: CalibrationMatrix
 ): ExtractionResult {
   // 1. Get 2D context
   const ctx = canvas.getContext('2d');
@@ -52,9 +60,14 @@ export function extractColorFromCanvas(
   const imageData = ctx.getImageData(region.x, region.y, region.width, region.height);
 
   // 4. Extract RGB pixels
-  const rgbPixels = getPixelsFromRegion(imageData, 0, 0, region.width, region.height);
+  let rgbPixels = getPixelsFromRegion(imageData, 0, 0, region.width, region.height);
   // NOTE: getPixelsFromRegion on the ImageData sub-region starts at (0,0)
   // because ctx.getImageData() already cropped to the region
+
+  // 4.5 Apply calibration BEFORE converting to Lab, if provided
+  if (calibration) {
+    rgbPixels = rgbPixels.map(rgb => applyCalibration(rgb, calibration));
+  }
 
   // 5. Convert to Lab
   const labPixels = rgbPixels.map(rgb => rgbToLab(rgb));

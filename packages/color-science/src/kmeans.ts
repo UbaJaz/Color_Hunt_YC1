@@ -4,6 +4,33 @@
 
 import { Lab, KMeansResult } from './types.js';
 
+// DESIGN DECISION: Small cluster penalty threshold
+// Clusters below 20% of total pixels get a graduated penalty to prevent
+// small high-chroma noise clusters (e.g., specular highlights) from winning
+// over larger representative clusters. The penalty ramps down linearly below
+// this threshold, making anything under ~15% heavily penalized.
+const SMALL_CLUSTER_RAMP_THRESHOLD = 0.20;
+
+// DESIGN DECISION: Hue divergence threshold
+// If the best-scoring cluster's hue diverges by more than 90 degrees from the
+// largest cluster's hue, prefer the larger cluster instead. This prevents
+// picking noise clusters with totally different hues from the actual object.
+const HUE_DIVERGENCE_THRESHOLD_DEG = 90;
+
+// DESIGN DECISION: Size threshold for hue-consistency check
+// Only apply hue-consistency check when the best cluster is smaller than this
+// fraction of total pixels, to avoid overriding legitimate choices when clusters
+// are similar in size.
+const HUE_CHECK_SIZE_THRESHOLD = 0.25;
+
+// DESIGN DECISION: Chroma threshold for hue-consistency check
+// Only apply hue-consistency check when the largest cluster has sufficient chroma
+// (colorfulness). This prevents the hue check from incorrectly preferring a large
+// dull background over a small vivid object (e.g., red berry against green leaf).
+// If the largest cluster is dull/neutral (low chroma), it's likely a background
+// and shouldn't override a small high-chroma foreground object.
+const HUE_CHECK_CHROMA_THRESHOLD = 15;
+
 /**
  * Calculate Euclidean distance between two Lab colors
  */
@@ -20,6 +47,37 @@ function labDistance(c1: Lab, c2: Lab): number {
  */
 function labChroma(c: Lab): number {
   return Math.sqrt(c.a * c.a + c.b * c.b);
+}
+
+/**
+ * Calculate hue angle in degrees from Lab a,b coordinates
+ * Returns value in [0, 360) range
+ */
+function labHueAngle(lab: Lab): number {
+  const hue = Math.atan2(lab.b, lab.a) * (180 / Math.PI);
+  return hue < 0 ? hue + 360 : hue;
+}
+
+/**
+ * Calculate size factor for cluster scoring
+ * Applies graduated penalty for small clusters and penalty for overly large clusters
+ * @param sizeRatio - Fraction of total pixels in this cluster (0-1)
+ * @returns Size factor (0-1, higher is better)
+ */
+export function calculateSizeFactor(sizeRatio: number): number {
+  let sizeFactor = Math.sqrt(sizeRatio);
+  
+  // Graduated ramp-down below threshold: at threshold gets 0.5x, at 0% gets 0x
+  if (sizeRatio < SMALL_CLUSTER_RAMP_THRESHOLD) {
+    sizeFactor *= (sizeRatio / SMALL_CLUSTER_RAMP_THRESHOLD) * 0.5;
+  }
+  
+  // Penalty for overly large clusters (>80% of image)
+  if (sizeRatio > 0.80) {
+    sizeFactor *= 0.5;
+  }
+  
+  return sizeFactor;
 }
 
 /**
@@ -179,12 +237,12 @@ function runKMeans(
 
 /**
  * Score a k-means result for quality (higher = better)
- * 
+ *
  * We want clusters that are:
  * 1. HIGH chroma (colorful, not gray/background)
  * 2. REASONABLE size (not too tiny, not the whole image)
  * 3. The chroma should be significantly higher than other clusters
- * 
+ *
  * New heuristic: chroma * sqrt(sizeRatio) with penalty for extremes
  */
 function scoreResult(result: KMeansResult): number {
@@ -199,14 +257,12 @@ function scoreResult(result: KMeansResult): number {
     .filter(x => x.index !== result.dominantIndex)
     .map(x => x.chroma);
   const maxOtherChroma = Math.max(...otherChromas);
-  
+
   // Chroma advantage: how much more saturated is this cluster vs others?
   const chromaAdvantage = dominantChroma - maxOtherChroma;
 
-  // Size factor: penalize if cluster is <5% or >80% of image
-  let sizeFactor = Math.sqrt(sizeRatio);
-  if (sizeRatio < 0.05) sizeFactor *= 0.3;
-  if (sizeRatio > 0.80) sizeFactor *= 0.5;
+  // Size factor: penalize if cluster is too small or too large
+  const sizeFactor = calculateSizeFactor(sizeRatio);
 
   // Score: chroma advantage weighted by reasonable size
   // This favors clusters that are both colorful AND well-sized
@@ -247,6 +303,33 @@ export function extractDominantColor(
     if (score > bestScore) {
       bestScore = score;
       bestResult = results[i];
+    }
+  }
+
+  // Hue-consistency sanity check: if the best-scoring cluster's hue diverges
+  // significantly from the largest cluster's hue, prefer the larger cluster.
+  // This prevents picking small high-chroma noise clusters with wrong hues.
+  // Only apply this check if the best cluster is significantly smaller than
+  // the largest cluster (less than 25% of total pixels), to avoid overriding
+  // legitimate choices when clusters are similar in size.
+  const totalSize = bestResult.clusterSizes.reduce((a, b) => a + b, 0);
+  const bestSize = bestResult.clusterSizes[bestResult.dominantIndex];
+  const bestSizeRatio = bestSize / totalSize;
+
+  if (bestSizeRatio < HUE_CHECK_SIZE_THRESHOLD) {
+    const largestClusterIndex = bestResult.clusterSizes.indexOf(Math.max(...bestResult.clusterSizes));
+    if (largestClusterIndex !== bestResult.dominantIndex) {
+      const bestHue = labHueAngle(bestResult.centroid);
+      const largestHue = labHueAngle(bestResult.allCentroids[largestClusterIndex]);
+      const hueDivergence = Math.abs(bestHue - largestHue);
+      // Handle wrap-around at 360°
+      const adjustedDivergence = Math.min(hueDivergence, 360 - hueDivergence);
+
+      if (adjustedDivergence > HUE_DIVERGENCE_THRESHOLD_DEG) {
+        // Hue divergence is too large - prefer the larger cluster
+        bestResult.dominantIndex = largestClusterIndex;
+        bestResult.centroid = bestResult.allCentroids[largestClusterIndex];
+      }
     }
   }
 

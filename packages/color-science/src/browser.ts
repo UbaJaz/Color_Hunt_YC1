@@ -5,7 +5,7 @@
 export type { RGB, Lab, XYZ, KMeansResult } from './types.js';
 
 // K-means color extraction (browser portable)
-export { extractDominantColor } from './kmeans.js';
+export { extractDominantColor, calculateSizeFactor } from './kmeans.js';
 
 // Outlier rejection (browser portable)
 export { rejectOutliers } from './outlierRejection.js';
@@ -30,3 +30,7 @@ export type { ExtractionResult } from './pipeline.js';
 // Confidence scoring (browser portable)
 export { calculateConfidence } from './confidence.js';
 export type { ConfidenceResult, ConfidenceLevel } from './confidence.js';
+
+// White-balance calibration (browser portable)
+export { estimateWhiteBalance, applyCalibration } from './calibration.js';
+export type { CalibrationMatrix } from './calibration.js';
