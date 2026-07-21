@@ -7,8 +7,7 @@ import { Lab, KMeansResult } from './types.js';
 // DESIGN DECISION: Small cluster penalty threshold
 // Clusters below 20% of total pixels get a graduated penalty to prevent
 // small high-chroma noise clusters (e.g., specular highlights) from winning
-// over larger representative clusters. The penalty ramps down linearly below
-// this threshold, making anything under ~15% heavily penalized.
+// over larger representative clusters.
 const SMALL_CLUSTER_RAMP_THRESHOLD = 0.20;
 
 // DESIGN DECISION: Hue divergence threshold
@@ -65,14 +64,19 @@ function labHueAngle(lab: Lab): number {
  * @returns Size factor (0-1, higher is better)
  */
 export function calculateSizeFactor(sizeRatio: number): number {
+  // Base size factor: use sqrt for a gentle falloff for most sizes
   let sizeFactor = Math.sqrt(sizeRatio);
   
-  // Graduated ramp-down below threshold: at threshold gets 0.5x, at 0% gets 0x
+  // AUDIT FIX: Make the penalty steeper below threshold.
+  // Using (ratio/threshold)^2 * 0.5 creates a much sharper drop for small clusters,
+  // ensuring that noise (usually <10%) cannot beat representative clusters (20%+).
   if (sizeRatio < SMALL_CLUSTER_RAMP_THRESHOLD) {
-    sizeFactor *= (sizeRatio / SMALL_CLUSTER_RAMP_THRESHOLD) * 0.5;
+    const ratio = sizeRatio / SMALL_CLUSTER_RAMP_THRESHOLD;
+    sizeFactor *= (ratio * ratio) * 0.5;
   }
   
   // Penalty for overly large clusters (>80% of image)
+  // This helps when the background is overwhelmingly dominant
   if (sizeRatio > 0.80) {
     sizeFactor *= 0.5;
   }
@@ -222,51 +226,36 @@ function runKMeans(
     clusterSizes[assignment]++;
   }
 
-  // Pick the most saturated (chromatic) cluster as the dominant color
+  // AUDIT FIX: Don't pre-pick dominantIndex here. 
+  // Let the scoring logic evaluate all clusters.
+  // We'll set a default for backward compatibility.
   const chromas = centroids.map(c => labChroma(c));
-  const dominantIndex = chromas.indexOf(Math.max(...chromas));
+  const maxChromaIndex = chromas.indexOf(Math.max(...chromas));
 
   return {
-    centroid: centroids[dominantIndex],
+    centroid: centroids[maxChromaIndex],
     clusterSizes,
     allCentroids: centroids,
     assignments,
-    dominantIndex
+    dominantIndex: maxChromaIndex
   };
 }
 
 /**
- * Score a k-means result for quality (higher = better)
- *
- * We want clusters that are:
- * 1. HIGH chroma (colorful, not gray/background)
- * 2. REASONABLE size (not too tiny, not the whole image)
- * 3. The chroma should be significantly higher than other clusters
- *
- * New heuristic: chroma * sqrt(sizeRatio) with penalty for extremes
+ * Score a specific cluster within a k-means result
  */
-function scoreResult(result: KMeansResult): number {
-  const dominantChroma = labChroma(result.centroid);
-  const dominantSize = result.clusterSizes[result.dominantIndex];
+function scoreCluster(result: KMeansResult, index: number): number {
+  const centroid = result.allCentroids[index];
+  const chroma = labChroma(centroid);
+  const size = result.clusterSizes[index];
   const totalSize = result.clusterSizes.reduce((a, b) => a + b, 0);
-  const sizeRatio = dominantSize / totalSize;
-
-  // Calculate max chroma of other clusters
-  const otherChromas = result.allCentroids
-    .map((c, i) => ({ chroma: labChroma(c), index: i }))
-    .filter(x => x.index !== result.dominantIndex)
-    .map(x => x.chroma);
-  const maxOtherChroma = Math.max(...otherChromas);
-
-  // Chroma advantage: how much more saturated is this cluster vs others?
-  const chromaAdvantage = dominantChroma - maxOtherChroma;
-
-  // Size factor: penalize if cluster is too small or too large
+  const sizeRatio = size / totalSize;
+  
   const sizeFactor = calculateSizeFactor(sizeRatio);
-
-  // Score: chroma advantage weighted by reasonable size
-  // This favors clusters that are both colorful AND well-sized
-  return chromaAdvantage * sizeFactor;
+  
+  // Primary heuristic: Chroma * SizeFactor
+  // This balances colorfulness with representativeness.
+  return chroma * sizeFactor;
 }
 
 /**
@@ -294,17 +283,27 @@ export function extractDominantColor(
     results.push(runKMeans(pixels, k, maxIterations, run));
   }
 
-  // Pick the result with the best score
-  let bestResult = results[0];
-  let bestScore = scoreResult(bestResult);
+  // AUDIT FIX: Evaluate ALL clusters across ALL runs to find the global best.
+  // Previously, we only looked at the most chromatic cluster of each run,
+  // which prevented larger but slightly less colorful clusters from ever winning.
+  let bestRunIndex = 0;
+  let bestClusterIndex = results[0].dominantIndex;
+  let bestScore = -Infinity;
 
-  for (let i = 1; i < results.length; i++) {
-    const score = scoreResult(results[i]);
-    if (score > bestScore) {
-      bestScore = score;
-      bestResult = results[i];
+  for (let r = 0; r < results.length; r++) {
+    for (let c = 0; c < k; c++) {
+      const score = scoreCluster(results[r], c);
+      if (score > bestScore) {
+        bestScore = score;
+        bestRunIndex = r;
+        bestClusterIndex = c;
+      }
     }
   }
+
+  const bestResult = results[bestRunIndex];
+  bestResult.dominantIndex = bestClusterIndex;
+  bestResult.centroid = bestResult.allCentroids[bestClusterIndex];
 
   // Hue-consistency sanity check: if the best-scoring cluster's hue diverges
   // significantly from the largest cluster's hue, prefer the larger cluster.
@@ -326,9 +325,16 @@ export function extractDominantColor(
       const adjustedDivergence = Math.min(hueDivergence, 360 - hueDivergence);
 
       if (adjustedDivergence > HUE_DIVERGENCE_THRESHOLD_DEG) {
-        // Hue divergence is too large - prefer the larger cluster
-        bestResult.dominantIndex = largestClusterIndex;
-        bestResult.centroid = bestResult.allCentroids[largestClusterIndex];
+        const largestCentroid = bestResult.allCentroids[largestClusterIndex];
+        const largestChroma = labChroma(largestCentroid);
+        
+        // AUDIT FIX: Only apply hue override if the largest cluster has sufficient chroma.
+        // This prevents the hue check from incorrectly preferring a large dull background
+        // over a small vivid object (e.g., red berry against green leaf).
+        if (largestChroma > HUE_CHECK_CHROMA_THRESHOLD) {
+          bestResult.dominantIndex = largestClusterIndex;
+          bestResult.centroid = largestCentroid;
+        }
       }
     }
   }
