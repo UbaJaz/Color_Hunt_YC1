@@ -28,7 +28,10 @@ const HUE_CHECK_SIZE_THRESHOLD = 0.25;
 // dull background over a small vivid object (e.g., red berry against green leaf).
 // If the largest cluster is dull/neutral (low chroma), it's likely a background
 // and shouldn't override a small high-chroma foreground object.
-const HUE_CHECK_CHROMA_THRESHOLD = 15;
+// Raised to 60 after regression testing to prevent moderately colorful backgrounds
+// (e.g., green leaves with chroma ~40) from overriding very vivid small objects
+// (e.g., red berries with chroma ~70).
+const HUE_CHECK_CHROMA_THRESHOLD = 60;
 
 /**
  * Calculate Euclidean distance between two Lab colors

@@ -37,3 +37,7 @@ export type { ConfidenceResult, ConfidenceLevel } from './confidence.js';
 // White-balance calibration (browser portable)
 export { estimateWhiteBalance, applyCalibration } from './calibration.js';
 export type { CalibrationMatrix } from './calibration.js';
+
+// Bonus voting logic (browser portable)
+export { calculateBonusMultiplier } from './bonusVoting.js';
+export type { VoteTally } from './bonusVoting.js';
