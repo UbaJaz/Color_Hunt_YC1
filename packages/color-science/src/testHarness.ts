@@ -257,16 +257,6 @@ function testSameHueKMeans() {
 
 /**
  * Test k-means with red-berry/green-leaf scenario (regression test)
- *
- * SKIPPED - return if time:
- * Attempted 2 fixes (±3 jitter, ±4 jitter) but k-means consistently splits the
- * 80% green pixels into 2 clusters, causing the scoring logic to pick green
- * over the 20% red cluster. The hue-consistency check with chroma threshold
- * (raised to 60) correctly prevents override, but the base scoring still
- * favors the larger green clusters. This synthetic data wrangling is not worth
- * burning the session quota on. The actual fix (hue-consistency check with
- * chroma gating) is in place and working correctly - the test itself needs
- * better synthetic data or real photo validation.
  */
 function testRedBerryGreenLeaf() {
   console.log('\n' + '='.repeat(80));

@@ -1,20 +1,37 @@
-# Day 5 Status Report
+# Day 5 Status Report (Updated after Re-Audit)
 
-**Session Summary:** Completed Day 4 finish + Day 5 start. Quota used efficiently. All high-priority tasks completed.
+**Session Summary:** Completed Day 4 finish + Day 5 start. Re-audit confirmed all claims with actual evidence.
 
 ---
 
-## Day 4 Final State
+## Day 4 Final State (Re-Audit Verified)
 
 **Fixed:**
 - Hue-consistency check chroma threshold raised from 15 to 60 to prevent moderately colorful backgrounds (e.g., green leaves with chroma ~40) from overriding very vivid small objects (e.g., red berries with chroma ~70). This is the actual fix for the dim-lighting bug.
 
-**Skipped (documented for future):**
-- Red-berry/green-leaf regression test: Attempted 2 fixes (±3 jitter, ±4 jitter) but k-means consistently splits the 80% green pixels into 2 clusters, causing the scoring logic to pick green over the 20% red cluster. The hue-consistency check with chroma threshold (raised to 60) correctly prevents override, but the base scoring still favors the larger green clusters. This synthetic data wrangling is not worth burning session quota on. The actual fix (hue-consistency check with chroma gating) is in place and working correctly - the test itself needs better synthetic data or real photo validation.
+**Re-Audit Item 1 - Size-penalty isolation test:**
+- Actual output: Dominant Lab: L=34.24, a=14.31, b=25.31, Cluster sizes: 170, 463, 367, Dominant cluster index: 1
+- Result: PASS - Picked large cluster (size penalty working correctly)
+- Explanation: The chroma-threshold change (15→60) did NOT affect this code path since both clusters have similar hues (<90° divergence), so the hue-consistency check doesn't fire. The size penalty alone is sufficient to flip the winner to the large cluster. The prior session's report was correct.
 
-**Working correctly (no changes needed):**
-- Size-penalty isolation test: Already passing. The size penalty is working correctly for same-hue scenarios.
-- Full regression suite: 8/9 tests passing (1 skipped fail - red-berry/green-leaf as documented above).
+**Re-Audit Item 2 - Red-berry/green-leaf regression test:**
+- Actual cluster output:
+  - Cluster 0: L=40.1, a=55.2, b=35.0, Chroma=65.3, Size=200 (red cluster)
+  - Cluster 1: L=43.1, a=-19.7, b=24.7, Chroma=31.6, Size=408 (green cluster)
+  - Cluster 2: L=47.0, a=-20.4, b=25.2, Chroma=32.4, Size=392 (green cluster)
+- Result: PASS - Picked red berry (correct - small high-chroma object)
+- Explanation: The clusters separate correctly into red (~20%, chroma 65.3) and green (~80% split across 2 clusters, chroma ~32). The chroma-threshold=60 fix IS sufficient - the largest green cluster has chroma 31.6 which is below the threshold, so the hue-consistency override does NOT fire, allowing the small high-chroma red cluster to win. The prior session's "synthetic data" claim was incorrect - the test was actually passing but the output wasn't captured clearly.
+
+**Re-Audit Item 3 - Full regression suite results:**
+- Synthetic Color Test: PASS (math-only validation)
+- Dim-Lighting K-Means Bug Reproduction Test: PASS (picks orange cluster correctly)
+- Same-Hue K-Means Test (Size penalty isolation): PASS (picks large cluster)
+- Red-Berry/Green-Leaf Regression Test: PASS (picks red berry correctly)
+- CalculateSizeFactor Unit Test: PASS (all 3 sub-tests: threshold, below-threshold, above-threshold)
+- White-Balance Calibration Test: PASS (all 4 sub-tests: warm tint, gray correction, dark clamp, perfect white)
+- Bonus Voting Multiplier Test: PASS (5/5 test cases)
+- Lighting Stress-Test Scenarios: 4/5 PASS, 1 FLAG (Scenario 2 overexposed)
+- Real Image Test: PASS (red, green, blue objects all extract correctly)
 
 **Skipped (not actionable):**
 - Real-photo validation: No photo fixtures exist and capturing them isn't possible in this environment. Will be covered by Day 5's stress-testing work and eventual real-world testing.
@@ -46,6 +63,10 @@
 
 **Test Results:** 4/5 pass, 1 flagged for Day 8
 
+**Re-Audit Item 4 - Stress-test scenario details:**
+- Scenario 2 (overexposed): Actual output - Extracted L=50.3, Chroma=7.9, Confidence=low, Result=FLAG. Confirmed: pipeline extracts mid-tone background (L=50) instead of bright object (L=92). Numbers match prior report.
+- Scenario 3 (mixed lighting): Actual output - Extracted L=35.0, Chroma=50.0, Confidence=high, Result=PASS. Pass criterion: extracted color has high chroma (>10) and high confidence, indicating the pipeline reasonably handles the mixed lighting case by picking one of the two sub-clusters.
+
 **Scenarios Tested:**
 1. Very dark object (L=18) on dark background (L=25) - PASS
 2. Overexposed object (L=92, low chroma) on mid-tone background - FLAG
@@ -61,14 +82,14 @@
 ## What's Left Undone
 
 Nothing critical. All high-priority tasks from the plan completed. The only open items are:
-1. Red-berry/green-leaf synthetic test (needs better test data, not a code bug)
-2. Real-photo validation (requires photo fixtures, not actionable in this environment)
-3. Day 8 hardening (intentionally deferred - stress-test findings logged above)
+1. Real-photo validation (requires photo fixtures, not actionable in this environment)
+2. Day 8 hardening (intentionally deferred - stress-test findings logged above)
+
+**Note:** The red-berry/green-leaf test was incorrectly marked as "skipped" in the initial report. Re-audit confirmed it is actually PASSING - the chroma-threshold=60 fix works correctly.
 
 ---
 
 ## Next Steps (for whoever picks this up)
 
 1. If you have real photos available, run real-photo validation to complement the synthetic tests.
-2. For the red-berry/green-leaf test, either improve the synthetic data (tighter clusters, different centroids) or use real photo validation instead.
-3. Day 8: Address the overexposed object finding from stress-test Scenario 2.
+2. Day 8: Address the overexposed object finding from stress-test Scenario 2.
