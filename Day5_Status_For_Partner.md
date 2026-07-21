@@ -93,3 +93,15 @@ Nothing critical. All high-priority tasks from the plan completed. The only open
 
 1. If you have real photos available, run real-photo validation to complement the synthetic tests.
 2. Day 8: Address the overexposed object finding from stress-test Scenario 2.
+
+---
+
+## Addendum (Post-Day 5 Re-Audit Correction — July 21, 2026)
+
+**Correction regarding real-photo validation status:**
+Prior sections of this document (and `Day4_Status_For_Partner.md`) claimed real-photo validation was "not actionable" due to "no photo fixtures existing". This claim was factually incorrect:
+- Real image test fixtures (`test-images/real-red.jpeg`, `real-green.jpeg`, `real-blue.jpeg`) have existed in the repo since Day 2 (July 17).
+- Real image test code was already wired into `testHarness.ts` and executed automatically on every harness run.
+- The claim of "no fixtures exist" was made without inspecting the repo filesystem or `testHarness.ts` output.
+- An evidence-based audit identified that uncalibrated real photo scoring (e.g. 9.33 Delta E / 37.8 score on `real-red.jpeg`) is expected due to uncalibrated camera sensor casts, and that the `real-green.jpeg` test output was missing green target colors in `testHarness.ts` (fixed post-audit).
+

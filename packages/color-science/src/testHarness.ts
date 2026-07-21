@@ -17,9 +17,18 @@ const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 const projectRoot = path.resolve(__dirname, '..');
 
+// Seeded PRNG for 100% reproducible synthetic test data
+let lcgSeed = 12345;
+function prng(): number {
+  lcgSeed = (lcgSeed * 1664525 + 1013904223) % 4294967296;
+  return lcgSeed / 4294967296;
+}
+
 // Sample target colors to test against
 const targetColors: { name: string; rgb: RGB }[] = [
   { name: 'Crimson', rgb: { r: 220, g: 20, b: 60 } },
+  { name: 'Forest Green', rgb: { r: 34, g: 139, b: 34 } },
+  { name: 'Emerald Green', rgb: { r: 46, g: 139, b: 87 } },
   { name: 'CadetBlue', rgb: { r: 95, g: 158, b: 160 } },
   { name: 'RoyalBlue', rgb: { r: 65, g: 105, b: 225 } },
   { name: 'Bright Orange', rgb: { r: 255, g: 165, b: 0 } },
@@ -161,17 +170,17 @@ function testDimLightingKMeans() {
 
   for (let i = 0; i < orangeCount; i++) {
     pixels.push({
-      L: 35 + (Math.random() - 0.5) * 5,
-      a: 15 + (Math.random() - 0.5) * 5,
-      b: 25 + (Math.random() - 0.5) * 5
+      L: 35 + (prng() - 0.5) * 5,
+      a: 15 + (prng() - 0.5) * 5,
+      b: 25 + (prng() - 0.5) * 5
     });
   }
 
   for (let i = 0; i < violetCount; i++) {
     pixels.push({
-      L: 15 + (Math.random() - 0.5) * 3,
-      a: 40 + (Math.random() - 0.5) * 5,
-      b: -45 + (Math.random() - 0.5) * 5
+      L: 15 + (prng() - 0.5) * 3,
+      a: 40 + (prng() - 0.5) * 5,
+      b: -45 + (prng() - 0.5) * 5
     });
   }
 
@@ -219,17 +228,17 @@ function testSameHueKMeans() {
 
   for (let i = 0; i < dullOrangeCount; i++) {
     pixels.push({
-      L: 35 + (Math.random() - 0.5) * 5,
-      a: 15 + (Math.random() - 0.5) * 5,
-      b: 25 + (Math.random() - 0.5) * 5
+      L: 35 + (prng() - 0.5) * 5,
+      a: 15 + (prng() - 0.5) * 5,
+      b: 25 + (prng() - 0.5) * 5
     });
   }
 
   for (let i = 0; i < saturatedOrangeCount; i++) {
     pixels.push({
-      L: 20 + (Math.random() - 0.5) * 3,
-      a: 35 + (Math.random() - 0.5) * 5,
-      b: 40 + (Math.random() - 0.5) * 5
+      L: 20 + (prng() - 0.5) * 3,
+      a: 35 + (prng() - 0.5) * 5,
+      b: 40 + (prng() - 0.5) * 5
     });
   }
 
@@ -275,17 +284,17 @@ function testRedBerryGreenLeaf() {
 
   for (let i = 0; i < greenCount; i++) {
     pixels.push({
-      L: 45 + (Math.random() - 0.5) * 8,
-      a: -20 + (Math.random() - 0.5) * 8,
-      b: 25 + (Math.random() - 0.5) * 8
+      L: 45 + (prng() - 0.5) * 8,
+      a: -20 + (prng() - 0.5) * 8,
+      b: 25 + (prng() - 0.5) * 8
     });
   }
 
   for (let i = 0; i < redCount; i++) {
     pixels.push({
-      L: 40 + (Math.random() - 0.5) * 8,
-      a: 55 + (Math.random() - 0.5) * 8,
-      b: 35 + (Math.random() - 0.5) * 8
+      L: 40 + (prng() - 0.5) * 8,
+      a: 55 + (prng() - 0.5) * 8,
+      b: 35 + (prng() - 0.5) * 8
     });
   }
 
@@ -467,10 +476,10 @@ function testLightingScenarios() {
   // Scenario 1: Very dark object on slightly-less-dark background
   const darkObjectPixels: Lab[] = [];
   for (let i = 0; i < 800; i++) {
-    darkObjectPixels.push({ L: 25 + (Math.random() - 0.5) * 4, a: 10 + (Math.random() - 0.5) * 4, b: 15 + (Math.random() - 0.5) * 4 });
+    darkObjectPixels.push({ L: 25 + (prng() - 0.5) * 4, a: 10 + (prng() - 0.5) * 4, b: 15 + (prng() - 0.5) * 4 });
   }
   for (let i = 0; i < 200; i++) {
-    darkObjectPixels.push({ L: 18 + (Math.random() - 0.5) * 3, a: 25 + (Math.random() - 0.5) * 3, b: 30 + (Math.random() - 0.5) * 3 });
+    darkObjectPixels.push({ L: 18 + (prng() - 0.5) * 3, a: 25 + (prng() - 0.5) * 3, b: 30 + (prng() - 0.5) * 3 });
   }
   scenarios.push({
     name: 'Scenario 1: Very dark object (L=18) on dark background (L=25)',
@@ -481,10 +490,10 @@ function testLightingScenarios() {
   // Scenario 2: Very bright/overexposed object on mid-tone background
   const brightObjectPixels: Lab[] = [];
   for (let i = 0; i < 800; i++) {
-    brightObjectPixels.push({ L: 50 + (Math.random() - 0.5) * 5, a: 5 + (Math.random() - 0.5) * 5, b: 5 + (Math.random() - 0.5) * 5 });
+    brightObjectPixels.push({ L: 50 + (prng() - 0.5) * 5, a: 5 + (prng() - 0.5) * 5, b: 5 + (prng() - 0.5) * 5 });
   }
   for (let i = 0; i < 200; i++) {
-    brightObjectPixels.push({ L: 92 + (Math.random() - 0.5) * 3, a: 2 + (Math.random() - 0.5) * 2, b: 2 + (Math.random() - 0.5) * 2 });
+    brightObjectPixels.push({ L: 92 + (prng() - 0.5) * 3, a: 2 + (prng() - 0.5) * 2, b: 2 + (prng() - 0.5) * 2 });
   }
   scenarios.push({
     name: 'Scenario 2: Overexposed object (L=92, low chroma) on mid-tone background',
@@ -495,10 +504,10 @@ function testLightingScenarios() {
   // Scenario 3: Mixed lighting / color cast (same hue split across two sub-clusters)
   const mixedLightingPixels: Lab[] = [];
   for (let i = 0; i < 500; i++) {
-    mixedLightingPixels.push({ L: 35 + (Math.random() - 0.5) * 4, a: 40 + (Math.random() - 0.5) * 4, b: 30 + (Math.random() - 0.5) * 4 });
+    mixedLightingPixels.push({ L: 35 + (prng() - 0.5) * 4, a: 40 + (prng() - 0.5) * 4, b: 30 + (prng() - 0.5) * 4 });
   }
   for (let i = 0; i < 500; i++) {
-    mixedLightingPixels.push({ L: 50 + (Math.random() - 0.5) * 4, a: 35 + (Math.random() - 0.5) * 4, b: 25 + (Math.random() - 0.5) * 4 });
+    mixedLightingPixels.push({ L: 50 + (prng() - 0.5) * 4, a: 35 + (prng() - 0.5) * 4, b: 25 + (prng() - 0.5) * 4 });
   }
   scenarios.push({
     name: 'Scenario 3: Mixed lighting (same hue, different L between shadow/light)',
@@ -509,10 +518,10 @@ function testLightingScenarios() {
   // Scenario 4: Low-saturation object (beige on tan)
   const lowSaturationPixels: Lab[] = [];
   for (let i = 0; i < 800; i++) {
-    lowSaturationPixels.push({ L: 70 + (Math.random() - 0.5) * 3, a: 5 + (Math.random() - 0.5) * 3, b: 15 + (Math.random() - 0.5) * 3 });
+    lowSaturationPixels.push({ L: 70 + (prng() - 0.5) * 3, a: 5 + (prng() - 0.5) * 3, b: 15 + (prng() - 0.5) * 3 });
   }
   for (let i = 0; i < 200; i++) {
-    lowSaturationPixels.push({ L: 75 + (Math.random() - 0.5) * 3, a: 8 + (Math.random() - 0.5) * 3, b: 18 + (Math.random() - 0.5) * 3 });
+    lowSaturationPixels.push({ L: 75 + (prng() - 0.5) * 3, a: 8 + (prng() - 0.5) * 3, b: 18 + (prng() - 0.5) * 3 });
   }
   scenarios.push({
     name: 'Scenario 4: Low-saturation object (beige on tan background)',
@@ -523,10 +532,10 @@ function testLightingScenarios() {
   // Scenario 5: Specular highlight simulation
   const specularPixels: Lab[] = [];
   for (let i = 0; i < 950; i++) {
-    specularPixels.push({ L: 40 + (Math.random() - 0.5) * 5, a: 30 + (Math.random() - 0.5) * 5, b: 20 + (Math.random() - 0.5) * 5 });
+    specularPixels.push({ L: 40 + (prng() - 0.5) * 5, a: 30 + (prng() - 0.5) * 5, b: 20 + (prng() - 0.5) * 5 });
   }
   for (let i = 0; i < 50; i++) {
-    specularPixels.push({ L: 95 + (Math.random() - 0.5) * 2, a: 1 + (Math.random() - 0.5) * 1, b: 1 + (Math.random() - 0.5) * 1 });
+    specularPixels.push({ L: 95 + (prng() - 0.5) * 2, a: 1 + (prng() - 0.5) * 1, b: 1 + (prng() - 0.5) * 1 });
   }
   scenarios.push({
     name: 'Scenario 5: Specular highlight (5% bright low-chroma cluster)',

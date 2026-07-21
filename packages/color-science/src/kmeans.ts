@@ -179,8 +179,20 @@ function recalculateCentroids(pixels: Lab[], assignments: number[], k: number): 
         b: sums[i].b / counts[i]
       });
     } else {
-      const randomIndex = Math.floor(Math.random() * pixels.length);
-      newCentroids.push({ ...pixels[randomIndex] });
+      // Deterministic fallback for empty cluster: pick pixel furthest from existing newCentroids
+      let maxMinDist = -1;
+      let bestPixelIndex = 0;
+      for (let j = 0; j < pixels.length; j++) {
+        const p = pixels[j];
+        const minDist = newCentroids.length > 0
+          ? Math.min(...newCentroids.map(c => labDistance(p, c)))
+          : 0;
+        if (minDist > maxMinDist) {
+          maxMinDist = minDist;
+          bestPixelIndex = j;
+        }
+      }
+      newCentroids.push({ ...pixels[bestPixelIndex] });
     }
   }
 

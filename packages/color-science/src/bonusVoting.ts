@@ -11,6 +11,9 @@ export interface VoteTally {
  * No votes = neutral (1.0x). At or below 50% approval = no bonus (1.0x floor —
  * an unpopular-but-valid find isn't penalized, just not rewarded).
  * Above 50% approval scales linearly up to 2.0x at 100% approval.
+ *
+ * NOTE FOR INTEGRATION: When applying this multiplier to a base score (e.g. finalScore = baseScore * multiplier),
+ * the combined result MUST be explicitly clamped to 100 max: Math.min(100, Math.round(baseScore * multiplier)).
  */
 export function calculateBonusMultiplier(votes: VoteTally): number {
   const total = votes.thumbsUp + votes.thumbsDown;
