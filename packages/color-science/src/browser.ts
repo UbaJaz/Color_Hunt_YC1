@@ -38,3 +38,7 @@ export type { CalibrationMatrix } from './calibration.js';
 // Bonus voting logic (browser portable)
 export { calculateBonusMultiplier } from './bonusVoting.js';
 export type { VoteTally } from './bonusVoting.js';
+
+// Random color generation with difficulty (browser portable)
+export { generateRandomTargetColor } from './randomColor.js';
+export type { Difficulty } from './randomColor.js';

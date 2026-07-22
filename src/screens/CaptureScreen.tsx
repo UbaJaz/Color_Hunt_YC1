@@ -4,40 +4,28 @@ import { CaptureButton } from '../components/camera/CaptureButton';
 import { PhotoPreview } from '../components/camera/PhotoPreview';
 import { TargetColorBanner } from '../components/camera/TargetColorBanner';
 import { useGameState } from '../state/GameStateContext';
-import { extractColorFromCanvas, rgbToLab, deltaE2000, deltaEToScore } from '@color-science';
+import { extractColorFromCanvas, rgbToLab, deltaE2000, deltaEToScore, calculateConfidence } from '@color-science';
 import type { CapturedPhoto } from '../types/capture';
 import type { TapSelection } from '../hooks/useTapSelection';
+import { Timer } from '../components/ui/Timer';
 
 interface CaptureScreenProps {
-  /** Fired once a round result has been recorded, so the parent can navigate to the results screen. */
   onRoundResultReady: () => void;
 }
 
-/**
- * Orchestrates the camera -> capture -> tap-to-select -> confirm flow.
- *
- * The canvas lives here as a ref (not converted to a data URL for storage) so
- * @color-science's `extractColorFromCanvas()` can call
- *   canvasRef.current.getContext('2d').getImageData(...)
- * directly on the same element that produced the capture, with no
- * encode/decode round-trip. `capturedPhoto` state only drives which UI shows
- * (live feed vs. preview) — it is not the source of truth for pixel data.
- */
 export function CaptureScreen({ onRoundResultReady }: CaptureScreenProps) {
-  const { currentRound, state, recordResult } = useGameState();
+  const { state, currentRound, recordResult } = useGameState();
   const videoElRef = useRef<HTMLVideoElement | null>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const [capturedPhoto, setCapturedPhoto] = useState<CapturedPhoto | null>(null);
-  // Gate the capture button on the video actually having usable dimensions,
-  // so we never draw a blank/black frame before metadata has loaded.
   const [videoReady, setVideoReady] = useState(false);
+
+  const player = state.players[currentRound!.currentPlayerIndex];
 
   const handleStreamReady = useCallback((video: HTMLVideoElement) => {
     videoElRef.current = video;
     const markReady = () => setVideoReady(video.videoWidth > 0 && video.videoHeight > 0);
-    if (video.readyState >= video.HAVE_METADATA) {
-      markReady();
-    }
+    if (video.readyState >= video.HAVE_METADATA) markReady();
     video.addEventListener('loadedmetadata', markReady);
   }, []);
 
@@ -66,21 +54,21 @@ export function CaptureScreen({ onRoundResultReady }: CaptureScreenProps) {
   const handleConfirmSelection = useCallback(
     (selection: TapSelection) => {
       const canvas = canvasRef.current;
-      const player = state.players[0];
-      if (!canvas || !player) return;
+      if (!canvas || !player || !currentRound) return;
 
-      // Real dominant-color extraction: k-means + outlier rejection, run in
-      // Lab space, via @color-science's extractColorFromCanvas(). This reads
-      // pixels directly from the capture canvas at the tapped point — the
-      // region it samples matches selection.naturalRegion (both derive from
-      // the same selectRegion() default proportion).
-      const extraction = extractColorFromCanvas(canvas, selection.naturalPoint.x, selection.naturalPoint.y);
+      const extraction = extractColorFromCanvas(
+        canvas, 
+        selection.naturalPoint.x, 
+        selection.naturalPoint.y,
+        3, 2, 0.20,
+        state.calibrationMatrix || undefined
+      );
 
-      // CIEDE2000 scoring against the round's target color (Jaswin's
-      // algorithm — consumed as-is, not duplicated here).
       const targetLab = rgbToLab(currentRound.targetColor.rgb);
       const deltaE = deltaE2000(extraction.extractedLab, targetLab);
       const score = deltaEToScore(deltaE);
+      
+      const confidence = calculateConfidence(extraction.extractedRgb, extraction.sampledPixels);
 
       recordResult({
         playerId: player.id,
@@ -88,18 +76,26 @@ export function CaptureScreen({ onRoundResultReady }: CaptureScreenProps) {
         extractedRgb: extraction.extractedRgb,
         deltaE,
         score,
+        confidence,
+        bonusVotes: null,
+        finalScore: null,
       });
 
       onRoundResultReady();
     },
-    [state.players, currentRound.targetColor, recordResult, onRoundResultReady]
+    [state.calibrationMatrix, player, currentRound, recordResult, onRoundResultReady]
   );
+
+  const handleTimeExpire = useCallback(() => {
+    if (!capturedPhoto) {
+      handleCapture();
+    }
+  }, [capturedPhoto, handleCapture]);
+
+  if (!currentRound) return null;
 
   return (
     <div className="flex h-full w-full flex-col">
-      {/* Canvas stays mounted (hidden) at all times so its ref is stable and
-          reachable by pixel-extraction code regardless of which UI branch below
-          is showing. */}
       <canvas ref={canvasRef} className="hidden" />
 
       {capturedPhoto ? (
@@ -111,8 +107,14 @@ export function CaptureScreen({ onRoundResultReady }: CaptureScreenProps) {
           onConfirmSelection={handleConfirmSelection}
         />
       ) : (
-        <div className="relative flex-1">
+        <div className="relative flex-1 bg-black">
           <TargetColorBanner targetColor={currentRound.targetColor} roundNumber={currentRound.roundNumber} />
+          <div className="absolute top-24 inset-x-0 z-10 flex justify-center">
+            <div className="bg-black/50 px-4 py-2 rounded-full backdrop-blur-md flex items-center gap-4">
+              <span className="text-white font-medium">{player?.name}'s Turn</span>
+              <Timer durationSeconds={60} onExpire={handleTimeExpire} />
+            </div>
+          </div>
           <CameraView onStreamReady={handleStreamReady} />
           <div className="absolute inset-x-0 bottom-0 flex justify-center pb-8 pt-4">
             <CaptureButton onCapture={handleCapture} disabled={!videoReady} />

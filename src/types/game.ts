@@ -1,4 +1,5 @@
 import type { RGB, Region, TargetColor } from './color';
+import type { ConfidenceResult, CalibrationMatrix } from '@color-science';
 
 export interface Player {
   id: string;
@@ -20,15 +21,20 @@ export interface RoundResult {
   extractedRgb: RGB | null;
   deltaE: number | null;
   score: number | null;
+  confidence: ConfidenceResult | null;
+  bonusVotes: { thumbsUp: number; thumbsDown: number } | null;
+  finalScore: number | null;
 }
 
 export interface Round {
   roundNumber: number;
   targetColor: TargetColor;
   results: RoundResult[];
+  currentPlayerIndex: number;
 }
 
 export interface GameState {
   players: Player[];
   rounds: Round[];
+  calibrationMatrix: CalibrationMatrix | null;
 }

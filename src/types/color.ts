@@ -6,12 +6,13 @@
  * single source of truth for these shapes and no drift is possible between
  * the app and the algorithm package.
  */
-export type { RGB, Region } from '@color-science';
-import type { RGB } from '@color-science';
+export type { RGB, Region, Difficulty } from '@color-science';
+import type { RGB, Difficulty } from '@color-science';
 
 export interface TargetColor {
   id: string;
   name: string;
   hex: string;
   rgb: RGB;
+  difficulty: Difficulty;
 }

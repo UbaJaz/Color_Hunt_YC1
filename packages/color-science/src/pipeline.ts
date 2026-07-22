@@ -15,6 +15,7 @@ export interface ExtractionResult {
   dominantClusterSize: number;
   totalPixelsSampled: number;
   region: Region;
+  sampledPixels: RGB[];
 }
 
 /**
@@ -92,6 +93,7 @@ export function extractColorFromCanvas(
     extractedLab: outlierResult.newCentroid,
     dominantClusterSize: dominantClusterPixels.length,
     totalPixelsSampled: rgbPixels.length,
-    region
+    region,
+    sampledPixels: rgbPixels
   };
 }

@@ -1,16 +1,5 @@
-import type { RGB, TargetColor } from '../types/color';
+import type { RGB, TargetColor, Difficulty } from '../types/color';
 
-/**
- * Placeholder target-color library.
- *
- * Per ColorHunt_Build_Plan_Split.md (Day 3 — Friend track): "Wire up the
- * target-color data structure (hex + friendly name library, even if
- * placeholder)." The real 20-30 color production palette is explicit Day 6
- * scope, owned by the color-science track. These are standard, well-known
- * named colors (deliberately not reused from Jaswin's Day 2 test palette —
- * see Day1_Day2_Summary_For_Partner.md's note on avoiding circular test
- * data) so this list is trivially swappable later without touching callers.
- */
 function hexToRgb(hex: string): RGB {
   const normalized = hex.replace('#', '');
   return {
@@ -20,34 +9,33 @@ function hexToRgb(hex: string): RGB {
   };
 }
 
-function defineColor(id: string, name: string, hex: string): TargetColor {
-  return { id, name, hex, rgb: hexToRgb(hex) };
+function defineColor(id: string, name: string, hex: string, difficulty: Difficulty): TargetColor {
+  return { id, name, hex, rgb: hexToRgb(hex), difficulty };
 }
 
 export const TARGET_COLORS: readonly TargetColor[] = [
-  defineColor('crimson', 'Crimson', '#DC143C'),
-  defineColor('coral', 'Coral', '#FF7F50'),
-  defineColor('goldenrod', 'Goldenrod', '#DAA520'),
-  defineColor('forest-green', 'Forest Green', '#228B22'),
-  defineColor('teal', 'Teal', '#008080'),
-  defineColor('cadet-blue', 'Cadet Blue', '#5F9EA0'),
-  defineColor('royal-blue', 'Royal Blue', '#4169E1'),
-  defineColor('slate-blue', 'Slate Blue', '#6A5ACD'),
-  defineColor('orchid', 'Orchid', '#DA70D6'),
-  defineColor('hot-pink', 'Hot Pink', '#FF69B4'),
-  defineColor('tomato', 'Tomato', '#FF6347'),
-  defineColor('chocolate', 'Chocolate', '#D2691E'),
-  defineColor('olive', 'Olive', '#808000'),
-  defineColor('sea-green', 'Sea Green', '#2E8B57'),
-  defineColor('steel-blue', 'Steel Blue', '#4682B4'),
-  defineColor('dark-orchid', 'Dark Orchid', '#9932CC'),
-  defineColor('firebrick', 'Firebrick', '#B22222'),
-  defineColor('sandy-brown', 'Sandy Brown', '#F4A460'),
-  defineColor('medium-turquoise', 'Medium Turquoise', '#48D1CC'),
-  defineColor('slate-gray', 'Slate Gray', '#708090'),
+  defineColor('crimson', 'Crimson', '#DC143C', 'easy'),
+  defineColor('coral', 'Coral', '#FF7F50', 'medium'),
+  defineColor('goldenrod', 'Goldenrod', '#DAA520', 'easy'),
+  defineColor('forest-green', 'Forest Green', '#228B22', 'easy'),
+  defineColor('teal', 'Teal', '#008080', 'medium'),
+  defineColor('cadet-blue', 'Cadet Blue', '#5F9EA0', 'medium'),
+  defineColor('royal-blue', 'Royal Blue', '#4169E1', 'easy'),
+  defineColor('slate-blue', 'Slate Blue', '#6A5ACD', 'medium'),
+  defineColor('orchid', 'Orchid', '#DA70D6', 'medium'),
+  defineColor('hot-pink', 'Hot Pink', '#FF69B4', 'easy'),
+  defineColor('tomato', 'Tomato', '#FF6347', 'medium'),
+  defineColor('chocolate', 'Chocolate', '#D2691E', 'medium'),
+  defineColor('olive', 'Olive', '#808000', 'hard'),
+  defineColor('sea-green', 'Sea Green', '#2E8B57', 'medium'),
+  defineColor('steel-blue', 'Steel Blue', '#4682B4', 'medium'),
+  defineColor('dark-orchid', 'Dark Orchid', '#9932CC', 'hard'),
+  defineColor('firebrick', 'Firebrick', '#B22222', 'hard'),
+  defineColor('sandy-brown', 'Sandy Brown', '#F4A460', 'medium'),
+  defineColor('medium-turquoise', 'Medium Turquoise', '#48D1CC', 'medium'),
+  defineColor('slate-gray', 'Slate Gray', '#708090', 'hard'),
 ];
 
-/** Picks a random target color, optionally excluding one (e.g. the previous round's) to avoid immediate repeats. */
 export function getRandomTargetColor(excludeId?: string): TargetColor {
   const pool = excludeId ? TARGET_COLORS.filter((c) => c.id !== excludeId) : TARGET_COLORS;
   const index = Math.floor(Math.random() * pool.length);
