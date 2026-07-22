@@ -6,15 +6,17 @@ import { CalibrationScreen } from './screens/CalibrationScreen';
 import { VotingScreen } from './screens/VotingScreen';
 import { LeaderboardScreen } from './screens/LeaderboardScreen';
 import { GameStateProvider, useGameState } from './state/GameStateContext';
+import type { GameSettings } from './types/game';
 
 type ScreenId = 'lobby' | 'calibration' | 'capture' | 'results' | 'voting' | 'leaderboard';
 
 function AppShell() {
-  const { currentRound, state, startRound } = useGameState();
+  const { currentRound, state, startGame, startRound } = useGameState();
   const [screen, setScreen] = useState<ScreenId>('lobby');
 
-  const handleStartGame = () => {
-    // If not calibrated, go to calibration. Else skip.
+  const handleStartGame = (settings: GameSettings) => {
+    startGame(settings);
+    // If not calibrated, go to calibration. Else go straight to capture.
     if (!state.calibrationMatrix) {
       setScreen('calibration');
     } else {
@@ -36,6 +38,16 @@ function AppShell() {
     }
   };
 
+  /**
+   * Day 7d: Retake handler — called when a player taps "Retake" on the Results
+   * screen (e.g. poor lighting). Goes back to CaptureScreen for the same player
+   * without advancing the turn index. Timer resets because CaptureScreen is
+   * keyed by round+playerIndex, so React remounts it fresh.
+   */
+  const handleRetake = () => {
+    setScreen('capture');
+  };
+
   const handleVotingComplete = () => {
     setScreen('leaderboard');
   };
@@ -52,7 +64,7 @@ function AppShell() {
       {screen === 'capture' && (
         <CaptureScreen key={`${currentRound?.roundNumber}-${currentRound?.currentPlayerIndex}`} onRoundResultReady={() => setScreen('results')} />
       )}
-      {screen === 'results' && <ResultsScreen onContinue={handleNextPlayerTurnOrVoting} />}
+      {screen === 'results' && <ResultsScreen onContinue={handleNextPlayerTurnOrVoting} onRetake={handleRetake} />}
       {screen === 'voting' && <VotingScreen onVotingComplete={handleVotingComplete} />}
       {screen === 'leaderboard' && <LeaderboardScreen onNextRound={handleNextRound} />}
     </div>

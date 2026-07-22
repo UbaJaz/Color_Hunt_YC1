@@ -45,3 +45,8 @@ export type { VoteTally } from './bonusVoting.js';
 // Random color generation with difficulty (browser portable)
 export { generateRandomTargetColor } from './randomColor.js';
 export type { Difficulty } from './randomColor.js';
+
+// Rarity tier logic (browser portable)
+export { getRarityTier, isSuccessfulUnlock, RARITY_DISPLAY } from './rarity.js';
+export type { RarityTier } from './rarity.js';
+

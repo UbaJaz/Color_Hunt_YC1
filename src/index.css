@@ -13,3 +13,20 @@ body {
   margin: 0;
   -webkit-tap-highlight-color: transparent;
 }
+
+/* Day 7b: Confetti burst animation for CelebrationOverlay.
+   Each particle uses --angle CSS custom property set inline from JSX. */
+@keyframes confettiBurst {
+  0% {
+    transform: translate(-50%, -50%) rotate(var(--angle)) translateX(0px);
+    opacity: 1;
+  }
+  80% {
+    opacity: 1;
+  }
+  100% {
+    transform: translate(-50%, -50%) rotate(var(--angle)) translateX(120px);
+    opacity: 0;
+  }
+}
+

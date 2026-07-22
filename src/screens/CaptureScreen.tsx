@@ -4,7 +4,7 @@ import { CaptureButton } from '../components/camera/CaptureButton';
 import { PhotoPreview } from '../components/camera/PhotoPreview';
 import { TargetColorBanner } from '../components/camera/TargetColorBanner';
 import { useGameState } from '../state/GameStateContext';
-import { extractColorFromCanvas, rgbToLab, deltaE2000, deltaEToScore, calculateConfidence } from '@color-science';
+import { extractColorFromCanvas, rgbToLab, deltaE2000, deltaEToScore, calculateConfidence, selectRegion } from '@color-science';
 import type { CapturedPhoto } from '../types/capture';
 import type { TapSelection } from '../hooks/useTapSelection';
 import { Timer } from '../components/ui/Timer';
@@ -57,8 +57,8 @@ export function CaptureScreen({ onRoundResultReady }: CaptureScreenProps) {
       if (!canvas || !player || !currentRound) return;
 
       const extraction = extractColorFromCanvas(
-        canvas, 
-        selection.naturalPoint.x, 
+        canvas,
+        selection.naturalPoint.x,
         selection.naturalPoint.y,
         3, 2, 0.20,
         state.calibrationMatrix || undefined
@@ -67,7 +67,7 @@ export function CaptureScreen({ onRoundResultReady }: CaptureScreenProps) {
       const targetLab = rgbToLab(currentRound.targetColor.rgb);
       const deltaE = deltaE2000(extraction.extractedLab, targetLab);
       const score = deltaEToScore(deltaE);
-      
+
       const confidence = calculateConfidence(extraction.extractedRgb, extraction.sampledPixels);
 
       recordResult({
@@ -86,11 +86,35 @@ export function CaptureScreen({ onRoundResultReady }: CaptureScreenProps) {
     [state.calibrationMatrix, player, currentRound, recordResult, onRoundResultReady]
   );
 
+  /**
+   * Fix 1: Timer expiry auto-confirm.
+   * Draws the current camera frame to canvas (regardless of whether the player
+   * had manually captured) then synthesises a center-pixel TapSelection and
+   * immediately confirms it. This prevents the game from stalling on
+   * PhotoPreview when the timer runs out. Timer resets on next mount
+   * because CaptureScreen is keyed by round+playerIndex in App.tsx.
+   */
   const handleTimeExpire = useCallback(() => {
-    if (!capturedPhoto) {
-      handleCapture();
-    }
-  }, [capturedPhoto, handleCapture]);
+    const video = videoElRef.current;
+    const canvas = canvasRef.current;
+    if (!video || !canvas || !videoReady) return;
+
+    canvas.width = video.videoWidth;
+    canvas.height = video.videoHeight;
+    const ctx = canvas.getContext('2d');
+    if (!ctx) return;
+    ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+
+    const cx = canvas.width / 2;
+    const cy = canvas.height / 2;
+    const region = selectRegion(cx, cy, canvas.width, canvas.height, 0.20);
+    handleConfirmSelection({
+      displayPoint: { x: cx, y: cy },
+      naturalPoint: { x: cx, y: cy },
+      naturalRegion: region,
+      displayRegion: region,
+    });
+  }, [videoReady, handleConfirmSelection]);
 
   if (!currentRound) return null;
 

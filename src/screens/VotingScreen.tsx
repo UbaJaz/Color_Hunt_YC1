@@ -21,11 +21,14 @@ export function VotingScreen({ onVotingComplete }: { onVotingComplete: () => voi
 
   const handleSubmit = () => {
     const resultsWithVotes = currentRound.results.map(result => {
-      // For simplicity in UI, we just map their own vote as if it's the group vote.
-      // In a real pass-and-play, maybe players pass the phone and everyone votes?
-      // MVP: you just vote yes/no on whether it's unlikely. Let's pretend a 'up' vote means 10 thumbs up, 'down' means 10 down for multiplier.
-      const vote = votes[result.playerId] || 'down';
-      const tally = vote === 'up' ? { thumbsUp: 1, thumbsDown: 0 } : { thumbsUp: 0, thumbsDown: 1 };
+      // Fix 2: Default unvoted items to a neutral tally {0,0} so
+      // calculateBonusMultiplier returns 1.0x — no penalty for forgotten votes.
+      const vote = votes[result.playerId];
+      const tally = vote === 'up'
+        ? { thumbsUp: 1, thumbsDown: 0 }
+        : vote === 'down'
+          ? { thumbsUp: 0, thumbsDown: 1 }
+          : { thumbsUp: 0, thumbsDown: 0 }; // neutral — no vote cast
       const multiplier = calculateBonusMultiplier(tally);
       const finalScore = Math.min(100, Math.round((result.score || 0) * multiplier));
 

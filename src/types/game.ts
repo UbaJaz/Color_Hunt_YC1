@@ -1,10 +1,23 @@
-import type { RGB, Region, TargetColor } from './color';
+import type { RGB, Region, TargetColor, Difficulty } from './color';
 import type { ConfidenceResult, CalibrationMatrix } from '@color-science';
 
 export interface Player {
   id: string;
   name: string;
   totalScore: number;
+}
+
+/**
+ * Host-configurable settings chosen in the Lobby before the game starts.
+ * Stored in GameState so all screens can access them without prop drilling.
+ */
+export interface GameSettings {
+  /** Total number of rounds to play. */
+  roundCount: number;
+  /** Difficulty filter applied to colour generation. */
+  difficulty: Difficulty;
+  /** When true, rounds use the procedural Lab-space generator instead of the curated preset list. */
+  useRandomColor: boolean;
 }
 
 /**
@@ -37,4 +50,7 @@ export interface GameState {
   players: Player[];
   rounds: Round[];
   calibrationMatrix: CalibrationMatrix | null;
+  /** Set by START_GAME action; null until the host confirms the Lobby. */
+  settings: GameSettings | null;
 }
+

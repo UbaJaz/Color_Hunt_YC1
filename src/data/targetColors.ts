@@ -1,4 +1,5 @@
 import type { RGB, TargetColor, Difficulty } from '../types/color';
+import { generateRandomTargetColor } from '@color-science';
 
 function hexToRgb(hex: string): RGB {
   const normalized = hex.replace('#', '');
@@ -7,6 +8,10 @@ function hexToRgb(hex: string): RGB {
     g: parseInt(normalized.slice(2, 4), 16),
     b: parseInt(normalized.slice(4, 6), 16),
   };
+}
+
+function rgbToHex({ r, g, b }: RGB): string {
+  return '#' + [r, g, b].map(n => n.toString(16).padStart(2, '0')).join('').toUpperCase();
 }
 
 function defineColor(id: string, name: string, hex: string, difficulty: Difficulty): TargetColor {
@@ -36,8 +41,30 @@ export const TARGET_COLORS: readonly TargetColor[] = [
   defineColor('slate-gray', 'Slate Gray', '#708090', 'hard'),
 ];
 
+/** Picks a random color from the curated preset list, optionally excluding the last one. */
 export function getRandomTargetColor(excludeId?: string): TargetColor {
   const pool = excludeId ? TARGET_COLORS.filter((c) => c.id !== excludeId) : TARGET_COLORS;
   const index = Math.floor(Math.random() * pool.length);
   return pool[index];
 }
+
+/**
+ * Fix 3 / Day 6: Generates a procedurally random target color using
+ * generateRandomTargetColor() from @color-science (perceptually uniform Lab space).
+ * Returns a TargetColor shape so it's a drop-in replacement wherever
+ * getRandomTargetColor() is used.
+ *
+ * Used when the host enables "Random Color" mode in the Lobby settings.
+ */
+export function getDynamicTargetColor(difficulty: Difficulty = 'medium'): TargetColor {
+  const rgb = generateRandomTargetColor(difficulty);
+  const hex = rgbToHex(rgb);
+  return {
+    id: `dynamic-${hex}`,
+    name: hex,        // hex shown as name — keeps UI honest about what the target is
+    hex,
+    rgb,
+    difficulty,
+  };
+}
+
