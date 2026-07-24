@@ -1,5 +1,5 @@
 // Test harness for ColorHunt color science core
-// Tests the full pipeline: load → RGB→Lab → k-means → outlier rejection → CIEDE2000
+// Tests the full pipeline: load â†’ RGBâ†’Lab â†’ k-means â†’ outlier rejection â†’ CIEDE2000
 
 import { loadFullImage } from './imageLoader.js';
 import { extractDominantColor, calculateSizeFactor } from './kmeans.js';
@@ -199,9 +199,9 @@ function testDimLightingKMeans() {
 
   console.log('\n' + '-'.repeat(80));
   if (isOrangeHue) {
-    console.log('✓ PASS: Picked orange cluster (correct - larger, representative)');
+    console.log('âœ“ PASS: Picked orange cluster (correct - larger, representative)');
   } else if (isVioletHue) {
-    console.log('✗ FAIL: Picked violet cluster (BUG - small high-chroma cluster won)');
+    console.log('âœ— FAIL: Picked violet cluster (BUG - small high-chroma cluster won)');
   } else {
     console.log('? UNCERTAIN: Picked a cluster that does not match expected hue');
   }
@@ -216,7 +216,7 @@ function testSameHueKMeans() {
   console.log('SAME-HUE K-MEANS TEST (Size penalty isolation)');
   console.log('='.repeat(80));
   console.log('Scenario: 83% dull orange cluster vs 17% saturated orange cluster');
-  console.log('Both clusters have similar hues (<90° divergence)');
+  console.log('Both clusters have similar hues (<90Â° divergence)');
   console.log('Expected: Should pick large orange cluster (size penalty alone flips winner)');
   console.log('='.repeat(80));
 
@@ -257,9 +257,9 @@ function testSameHueKMeans() {
 
   console.log('\n' + '-'.repeat(80));
   if (pickedLargeCluster) {
-    console.log('✓ PASS: Picked large cluster (size penalty working correctly)');
+    console.log('âœ“ PASS: Picked large cluster (size penalty working correctly)');
   } else {
-    console.log('✗ FAIL: Picked small cluster (size penalty not working)');
+    console.log('âœ— FAIL: Picked small cluster (size penalty not working)');
   }
   console.log('-'.repeat(80));
 }
@@ -322,9 +322,9 @@ function testRedBerryGreenLeaf() {
 
   console.log('\n' + '-'.repeat(80));
   if (isRedHue) {
-    console.log('✓ PASS: Picked red berry (correct - small high-chroma object)');
+    console.log('âœ“ PASS: Picked red berry (correct - small high-chroma object)');
   } else if (isGreenHue) {
-    console.log('✗ FAIL: Picked green leaf (REGRESSION - hue check broke intended behavior)');
+    console.log('âœ— FAIL: Picked green leaf (REGRESSION - hue check broke intended behavior)');
   } else {
     console.log('? UNCERTAIN: Picked a cluster that does not match expected hue');
   }
@@ -361,18 +361,24 @@ function testCalculateSizeFactor() {
   console.log('  At 0.20 threshold (exact): sizeFactor should be sqrt(0.20) = 0.447 (no ramp, condition is < not <=)');
   const thresholdFactor = calculateSizeFactor(0.20);
   console.log(`  Actual: ${thresholdFactor.toFixed(4)}`);
-  console.log(`  ${Math.abs(thresholdFactor - 0.447) < 0.01 ? '✓ PASS' : '✗ FAIL'}: Threshold logic correct`);
+  console.log(`  ${Math.abs(thresholdFactor - 0.447) < 0.01 ? 'âœ“ PASS' : 'âœ— FAIL'}: Threshold logic correct`);
 
   console.log('\n  At 0.19 (just below threshold): sizeFactor should be sqrt(0.19) * (0.19/0.20)^2 * 0.5 = 0.436 * 0.451 = 0.197');
   const belowThresholdFactor = calculateSizeFactor(0.19);
   console.log(`  Actual: ${belowThresholdFactor.toFixed(4)}`);
-  console.log(`  ${Math.abs(belowThresholdFactor - 0.197) < 0.01 ? '✓ PASS' : '✗ FAIL'}: Below-threshold ramp correct`);
+  console.log(`  ${Math.abs(belowThresholdFactor - 0.197) < 0.01 ? 'âœ“ PASS' : 'âœ— FAIL'}: Below-threshold ramp correct`);
 
   console.log('\nVerification of above-threshold behavior:');
   console.log('  At 0.25 (above 0.20 threshold): sizeFactor should be sqrt(0.25) = 0.5');
   const aboveThresholdFactor = calculateSizeFactor(0.25);
   console.log(`  Actual: ${aboveThresholdFactor.toFixed(4)}`);
-  console.log(`  ${Math.abs(aboveThresholdFactor - 0.5) < 0.01 ? '✓ PASS' : '✗ FAIL'}: Above-threshold logic correct`);
+  console.log(`  ${Math.abs(aboveThresholdFactor - 0.5) < 0.01 ? 'âœ“ PASS' : 'âœ— FAIL'}: Above-threshold logic correct`);
+
+  console.log('\nVerification of large-cluster penalty:');
+  console.log('  At 0.80 (exact boundary, now uses >=): sizeFactor should be sqrt(0.80) * 0.5 = 0.894 * 0.5 = 0.447');
+  const largeFactor = calculateSizeFactor(0.80);
+  console.log(`  Actual: ${largeFactor.toFixed(4)}`);
+  console.log(`  ${Math.abs(largeFactor - 0.447) < 0.01 ? '\u2713 PASS' : '\u2717 FAIL'}: Large-cluster penalty fires at >= 0.80`);
 
   console.log('-'.repeat(80));
 }
@@ -393,7 +399,7 @@ function testCalibration() {
   console.log(`    gScale: ${warmCalibration.gScale.toFixed(3)}`);
   console.log(`    bScale: ${warmCalibration.bScale.toFixed(3)}`);
   const warmTest = warmCalibration.gScale > 1 && warmCalibration.bScale > 1 && Math.abs(warmCalibration.rScale - 1) < 0.1;
-  console.log(`  ${warmTest ? '✓ PASS' : '✗ FAIL'}: Warm tint correctly identified`);
+  console.log(`  ${warmTest ? 'âœ“ PASS' : 'âœ— FAIL'}: Warm tint correctly identified`);
 
   console.log('\nTest 2: Apply calibration to neutral gray (128, 128, 128)');
   const neutralGray = { r: 128, g: 128, b: 128 };
@@ -401,7 +407,7 @@ function testCalibration() {
   console.log(`  Original: (${neutralGray.r}, ${neutralGray.g}, ${neutralGray.b})`);
   console.log(`  Corrected: (${correctedGray.r}, ${correctedGray.g}, ${correctedGray.b})`);
   const grayTest = correctedGray.g > neutralGray.g && correctedGray.b > neutralGray.b;
-  console.log(`  ${grayTest ? '✓ PASS' : '✗ FAIL'}: Gray correctly warmed`);
+  console.log(`  ${grayTest ? 'âœ“ PASS' : 'âœ— FAIL'}: Gray correctly warmed`);
 
   console.log('\nTest 3: Pathological case (10, 10, 10) - badly-lit calibration');
   const darkCard = { r: 10, g: 10, b: 10 };
@@ -411,7 +417,7 @@ function testCalibration() {
   console.log(`    gScale: ${darkCalibration.gScale.toFixed(3)}`);
   console.log(`    bScale: ${darkCalibration.bScale.toFixed(3)}`);
   const darkTest = darkCalibration.rScale === 3 && darkCalibration.gScale === 3 && darkCalibration.bScale === 3;
-  console.log(`  ${darkTest ? '✓ PASS' : '✗ FAIL'}: Clamp correctly applied`);
+  console.log(`  ${darkTest ? 'âœ“ PASS' : 'âœ— FAIL'}: Clamp correctly applied`);
 
   console.log('\nTest 4: Perfect white card (255, 255, 255)');
   const perfectWhite = { r: 255, g: 255, b: 255 };
@@ -423,7 +429,7 @@ function testCalibration() {
   const perfectTest = Math.abs(perfectCalibration.rScale - 1) < 0.01 &&
                       Math.abs(perfectCalibration.gScale - 1) < 0.01 &&
                       Math.abs(perfectCalibration.bScale - 1) < 0.01;
-  console.log(`  ${perfectTest ? '✓ PASS' : '✗ FAIL'}: No correction needed`);
+  console.log(`  ${perfectTest ? 'âœ“ PASS' : 'âœ— FAIL'}: No correction needed`);
 
   console.log('\n' + '-'.repeat(80));
 }
@@ -437,11 +443,11 @@ function testBonusVoting() {
   console.log('='.repeat(80));
 
   const testCases: { votes: VoteTally; expected: number; description: string }[] = [
-    { votes: { thumbsUp: 0, thumbsDown: 0 }, expected: 1.0, description: '0 votes → 1.0' },
-    { votes: { thumbsUp: 5, thumbsDown: 5 }, expected: 1.0, description: '5 up, 5 down (50%) → 1.0' },
-    { votes: { thumbsUp: 10, thumbsDown: 0 }, expected: 2.0, description: '10 up, 0 down (100%) → 2.0' },
-    { votes: { thumbsUp: 7, thumbsDown: 3 }, expected: 1.4, description: '7 up, 3 down (70%) → 1.4' },
-    { votes: { thumbsUp: 2, thumbsDown: 8 }, expected: 1.0, description: '2 up, 8 down (20%) → 1.0 (floor)' }
+    { votes: { thumbsUp: 0, thumbsDown: 0 }, expected: 1.0, description: '0 votes â†’ 1.0' },
+    { votes: { thumbsUp: 5, thumbsDown: 5 }, expected: 1.0, description: '5 up, 5 down (50%) â†’ 1.0' },
+    { votes: { thumbsUp: 10, thumbsDown: 0 }, expected: 2.0, description: '10 up, 0 down (100%) â†’ 2.0' },
+    { votes: { thumbsUp: 7, thumbsDown: 3 }, expected: 1.4, description: '7 up, 3 down (70%) â†’ 1.4' },
+    { votes: { thumbsUp: 2, thumbsDown: 8 }, expected: 1.0, description: '2 up, 8 down (20%) â†’ 1.0 (floor)' }
   ];
 
   console.log('\n' + '-'.repeat(80));
@@ -453,7 +459,7 @@ function testBonusVoting() {
     const actual = calculateBonusMultiplier(testCase.votes);
     const passed = Math.abs(actual - testCase.expected) < 0.01;
     if (passed) passCount++;
-    console.log(`| ${testCase.description.padEnd(35)} | ${testCase.votes.thumbsUp.toString().padEnd(5)} | ${testCase.votes.thumbsDown.toString().padEnd(5)} | ${testCase.expected.toFixed(1).padEnd(10)} | ${actual.toFixed(1).padEnd(10)} | ${passed ? '✓ PASS' : '✗ FAIL'}${''.padEnd(6)} |`);
+    console.log(`| ${testCase.description.padEnd(35)} | ${testCase.votes.thumbsUp.toString().padEnd(5)} | ${testCase.votes.thumbsDown.toString().padEnd(5)} | ${testCase.expected.toFixed(1).padEnd(10)} | ${actual.toFixed(1).padEnd(10)} | ${passed ? 'âœ“ PASS' : 'âœ— FAIL'}${''.padEnd(6)} |`);
   }
 
   console.log('-'.repeat(80));
@@ -549,31 +555,131 @@ function testLightingScenarios() {
 
   const findings: string[] = [];
 
-  for (const scenario of scenarios) {
+  for (let si = 0; si < scenarios.length; si++) {
+    const scenario = scenarios[si];
     const result = extractDominantColor(scenario.pixels, 3);
     const dominantLab = result.centroid;
     const chroma = Math.sqrt(dominantLab.a * dominantLab.a + dominantLab.b * dominantLab.b);
-    
+
     // Convert Lab pixels to RGB for confidence calculation
     const rgbPixels = scenario.pixels.map(lab => labToRgb(lab));
     const dominantRgb = labToRgb(dominantLab);
     const confidence = calculateConfidence(dominantRgb, rgbPixels);
 
-    // Check scenario-specific pass conditions
     let isCloseEnough = false;
-    if (scenario.name.includes('Scenario 2')) {
-      // Scenario 2 expects the overexposed object (L > 80) to be extracted despite low chroma
-      isCloseEnough = dominantLab.L > 80;
+
+    // -----------------------------------------------------------------------
+    // Scenario 2: Overexposed object (L=92 low-chroma cluster) must WIN
+    // OLD (broken): isCloseEnough = dominantLab.L > 85
+    //   This trivially passes even if the background wins, as long as the
+    //   background itself has L > 85 â€” it does NOT verify the feature fired.
+    // NEW: Find which cluster has highest L (that is the overexposed object
+    //   cluster). The dominant/winning cluster must BE that cluster.
+    // -----------------------------------------------------------------------
+    if (si === 1) { // Scenario 2
+      console.log('\n  [Scenario 2 cluster diagnostic]');
+      result.allCentroids.forEach((c, i) => {
+        const cChroma = Math.sqrt(c.a * c.a + c.b * c.b);
+        const size = result.clusterSizes[i];
+        const winner = i === result.dominantIndex ? ' â† WINNER' : '';
+        console.log(`    Cluster ${i}: L=${c.L.toFixed(1)}, Chroma=${cChroma.toFixed(1)}, Size=${size}${winner}`);
+      });
+      // The overexposed-object cluster is the one with highest L
+      const highestLClusterIndex = result.allCentroids
+        .map((c, i) => ({ L: c.L, i }))
+        .reduce((best, curr) => curr.L > best.L ? curr : best).i;
+      // PASS only if the WINNER is the high-L cluster (overexposed object cluster)
+      isCloseEnough = result.dominantIndex === highestLClusterIndex;
+      if (!isCloseEnough) {
+        findings.push(
+          `${scenario.name}: Overexposed cluster (highest-L idx=${highestLClusterIndex}) did NOT win. ` +
+          `Winner is cluster ${result.dominantIndex} (L=${dominantLab.L.toFixed(1)}). ` +
+          `Lightness significance boost failed to elevate the overexposed cluster.`
+        );
+      }
+
+    // -----------------------------------------------------------------------
+    // Scenario 3: Mixed lighting / hue-merge fired
+    // OLD (broken): isCloseEnough = chroma > 10
+    //   Any cluster with the slightest chroma passes â€” does NOT verify merge.
+    // NEW: (a) The winning cluster must have a hue within 30Â° of at least one
+    //   other substantial cluster (Î”h â‰¤ 30Â° condition from scoreCluster()).
+    //   (b) The winning cluster must have been the cluster whose effectiveSize
+    //   was boosted by the merge (i.e., effectiveSize > actualSize for winner).
+    //   This WOULD FAIL if the merge logic were absent: without the size boost,
+    //   a different cluster (e.g. a higher-chroma one) would outscore it.
+    // -----------------------------------------------------------------------
+    } else if (si === 2) { // Scenario 3
+      console.log('\n  [Scenario 3 cluster diagnostic]');
+      const totalSizeSc3 = result.clusterSizes.reduce((a, b) => a + b, 0);
+      result.allCentroids.forEach((c, i) => {
+        const cChroma = Math.sqrt(c.a * c.a + c.b * c.b);
+        const size = result.clusterSizes[i];
+        const hue = Math.atan2(c.b, c.a) * (180 / Math.PI);
+        const winner = i === result.dominantIndex ? ' â† WINNER' : '';
+        console.log(`    Cluster ${i}: L=${c.L.toFixed(1)}, Chroma=${cChroma.toFixed(1)}, Hue=${hue.toFixed(1)}Â°, Size=${size} (${(size/totalSizeSc3*100).toFixed(1)}%)${winner}`);
+      });
+
+      const winnerIdx = result.dominantIndex;
+      const winnerCentroid = result.allCentroids[winnerIdx];
+      const winnerHue = Math.atan2(winnerCentroid.b, winnerCentroid.a) * (180 / Math.PI);
+      const winnerSizeRatio = result.clusterSizes[winnerIdx] / totalSizeSc3;
+      const winnerChroma = Math.sqrt(winnerCentroid.a * winnerCentroid.a + winnerCentroid.b * winnerCentroid.b);
+
+      // (a) Does the winner have a same-hue neighbour (Î”h â‰¤ 30Â°) that is also substantial (â‰¥ 15%)?
+      // Take the neighbour whose size ratio is CLOSEST to the winner's (most comparable).
+      // This mirrors the comparability guard in scoreCluster() and prevents the last-seen
+      // neighbour from overwriting a better one if it fails the comparability check.
+      let hasSameHueNeighbour = false;
+      let neighbourIdx = -1;
+      let bestRatioDiff = Infinity;
+      for (let j = 0; j < result.allCentroids.length; j++) {
+        if (j === winnerIdx) continue;
+        const c = result.allCentroids[j];
+        const otherHue = Math.atan2(c.b, c.a) * (180 / Math.PI);
+        const diff = Math.abs(winnerHue - otherHue);
+        const hueDiff = Math.min(diff, 360 - diff);
+        const otherSizeRatio = result.clusterSizes[j] / totalSizeSc3;
+        const ratioDiff = Math.abs(winnerSizeRatio - otherSizeRatio);
+        if (hueDiff <= 30 && otherSizeRatio >= 0.15 && ratioDiff < bestRatioDiff) {
+          hasSameHueNeighbour = true;
+          neighbourIdx = j;
+          bestRatioDiff = ratioDiff;
+        }
+      }
+
+      // (b) Would the effective merged size of the winner exceed its raw size?
+      //     (Mirrors the merge condition from scoreCluster())
+      let mergeFired = false;
+      if (hasSameHueNeighbour && neighbourIdx !== -1 && winnerSizeRatio >= 0.15 && winnerChroma >= 10) {
+        const otherSizeRatio = result.clusterSizes[neighbourIdx] / totalSizeSc3;
+        if (Math.abs(winnerSizeRatio - otherSizeRatio) <= 0.25) {
+          mergeFired = true;
+        }
+      }
+
+      console.log(`    Winner hue: ${winnerHue.toFixed(1)}Â°, same-hue neighbour found: ${hasSameHueNeighbour}, merge fired: ${mergeFired}`);
+
+      // Both conditions must hold: winner is in a same-hue pair AND merge fired
+      isCloseEnough = hasSameHueNeighbour && mergeFired;
+      if (!isCloseEnough) {
+        findings.push(
+          `${scenario.name}: Hue-merge did not fire or winner has no same-hue neighbour (â‰¥15%). ` +
+          `hasSameHueNeighbour=${hasSameHueNeighbour}, mergeFired=${mergeFired}. ` +
+          `Hue-cluster merging logic may be broken or not being reached.`
+        );
+      }
+
     } else {
+      // All other scenarios: generic check
       isCloseEnough = chroma > 10 || confidence.level !== 'low';
+      if (!isCloseEnough) {
+        findings.push(`${scenario.name}: Extracted chroma=${chroma.toFixed(1)}, confidence=${confidence.level} - ${scenario.expected}`);
+      }
     }
+
     const resultStr = isCloseEnough ? 'PASS' : 'FLAG';
-
     console.log(`| ${scenario.name.padEnd(50)} | ${dominantLab.L.toFixed(1).padEnd(12)} | ${chroma.toFixed(1).padEnd(10)} | ${confidence.level.padEnd(12)} | ${resultStr.padEnd(10)} |`);
-
-    if (!isCloseEnough) {
-      findings.push(`${scenario.name}: Extracted chroma=${chroma.toFixed(1)}, confidence=${confidence.level} - ${scenario.expected}`);
-    }
   }
 
   console.log('-'.repeat(80));
@@ -587,6 +693,57 @@ function testLightingScenarios() {
     console.log('\nNo issues flagged - all scenarios handled reasonably.');
   }
 
+  console.log('-'.repeat(80));
+}
+
+/**
+ * Test low-chroma dark object extraction with lightness significance & perceptual weighting
+ */
+function testLowChromaDarkObject() {
+  console.log('\n' + '='.repeat(80));
+  console.log('LOW-CHROMA DARK OBJECT UNIT TEST (Perceptual weighting & lightness significance)');
+  console.log('='.repeat(80));
+  console.log('Scenario: 20% dark low-chroma object (L=18, a=3, b=4, Chroma=5)');
+  console.log('         80% mid-tone background noise (L=50, a=7, b=10, Chroma=12)');
+  console.log('Expected: Should extract dark object (L ~ 18) due to lightness significance');
+  console.log('='.repeat(80));
+
+  const pixels: Lab[] = [];
+  // 80% background noise
+  for (let i = 0; i < 800; i++) {
+    pixels.push({ L: 50 + (prng() - 0.5) * 4, a: 7 + (prng() - 0.5) * 3, b: 10 + (prng() - 0.5) * 3 });
+  }
+  // 20% dark object
+  for (let i = 0; i < 200; i++) {
+    pixels.push({ L: 18 + (prng() - 0.5) * 3, a: 3 + (prng() - 0.5) * 2, b: 4 + (prng() - 0.5) * 2 });
+  }
+
+  const result = extractDominantColor(pixels, 3);
+  const dominantLab = result.centroid;
+  const extractedRgb = labToRgb(dominantLab);
+
+  // Show raw cluster split â€” key diagnostic to confirm DarkestPixel seeding
+  // produced a cleanly separated dark cluster before scoring fires.
+  const totalPixels = result.clusterSizes.reduce((a, b) => a + b, 0);
+  console.log('\nCluster split (all clusters):');
+  result.allCentroids.forEach((c, i) => {
+    const cChroma = Math.sqrt(c.a * c.a + c.b * c.b);
+    const pct = (result.clusterSizes[i] / totalPixels * 100).toFixed(1);
+    const winner = i === result.dominantIndex ? ' â† WINNER (scored highest)' : '';
+    console.log(`  Cluster ${i}: L=${c.L.toFixed(1)}, Chroma=${cChroma.toFixed(2)}, Size=${result.clusterSizes[i]} (${pct}%)${winner}`);
+  });
+
+  console.log(`\nExtracted Centroid Lab: L=${dominantLab.L.toFixed(1)}, a=${dominantLab.a.toFixed(1)}, b=${dominantLab.b.toFixed(1)}`);
+  console.log(`Extracted RGB: (${extractedRgb.r}, ${extractedRgb.g}, ${extractedRgb.b})`);
+
+  const isDarkObjectExtracted = dominantLab.L < 25;
+
+  console.log('-'.repeat(80));
+  if (isDarkObjectExtracted) {
+    console.log('âœ“ PASS: Low-chroma dark object correctly extracted via lightness significance');
+  } else {
+    console.log('âœ— FAIL: Low-chroma dark object lost to mid-tone background noise');
+  }
   console.log('-'.repeat(80));
 }
 
@@ -605,6 +762,7 @@ async function main() {
   testCalculateSizeFactor();
   testCalibration();
   testBonusVoting();
+  testLowChromaDarkObject();
   testLightingScenarios();
 
   const imagePaths: { path: string; name: string }[] = [

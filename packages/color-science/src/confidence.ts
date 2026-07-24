@@ -1,12 +1,29 @@
 // Confidence scoring for lighting quality assessment
 // Pure function - browser portable
+//
+// IMPORTANT — COORDINATE SPACE:
+// This module works entirely in sRGB brightness space (mean of R, G, B channels,
+// each in [0, 255]).  It does NOT use Lab L* values.
+//
+// Relationship between the two spaces (approximate, non-linear):
+//   sRGB mean 30  ≈  Lab L*  11.5  (pitch-black boundary)
+//   sRGB mean 128 ≈  Lab L*  53.4  (mid-tone)
+//   sRGB mean 225 ≈  Lab L*  88.5  (near-white boundary)
+//
+// kmeans.ts uses Lab L* thresholds (dark: L < 25, light: L > 85, specular: L > 90).
+// Those numbers are NOT directly comparable to the sRGB thresholds here (30 / 225).
+// The two systems serve different purposes and are intentionally separate:
+//   - confidence.ts flags whether the PHOTO EXPOSURE is usable.
+//   - kmeans.ts boosts individual cluster scores for dark/light OBJECTS within the photo.
 
 import { RGB } from './types.js';
 
 export type ConfidenceLevel = 'high' | 'low';
+export type LightingDiagnostic = 'good' | 'underexposed' | 'overexposed' | 'high_variance';
 
 export interface ConfidenceResult {
   level: ConfidenceLevel;
+  diagnostic: LightingDiagnostic;
   variance: number;
   brightness: number;
   reasons: string[];
@@ -38,30 +55,12 @@ function calculatePixelVariance(pixels: RGB[]): number {
 /**
  * Calculate confidence score for a color extraction.
  * 
- * DESIGN DECISION: Operate on the sampled region's pixels (not the entire image)
- * Rationale: The confidence assessment should reflect the quality of the specific
- * region the user tapped, not the overall photo. A photo might have good lighting
- * overall but the tapped region could be in shadow or have a specular highlight.
- * By operating on the sampled pixels, we give localized feedback that matches
- * what the user actually selected.
- * 
- * DESIGN DECISION: Threshold values
- * - Variance threshold: 2000 (empirically chosen - high variance indicates mixed
- *   lighting, noise, or a region spanning multiple objects)
- * - Brightness range: 30-225 (out-of-range values indicate underexposed or
- *   overexposed regions where color extraction is unreliable)
- * 
- * These thresholds are conservative - they flag clearly problematic conditions
- * rather than attempting to be perfect. The goal is to catch obvious retake cases
- * (too dark, too bright, noisy region) without being overly strict.
- * 
  * @param extractedRgb - The final extracted RGB color
- * @param sampledPixels - The RGB pixels from the sampled region (same data used
- *   for k-means extraction in pipeline.ts)
+ * @param sampledPixels - The RGB pixels from the sampled region
  * @param varianceThreshold - Maximum acceptable variance (default: 2000)
- * @param minBrightness - Minimum acceptable brightness (default: 30)
- * @param maxBrightness - Maximum acceptable brightness (default: 225)
- * @returns Confidence result with level and diagnostic information
+ * @param minBrightness - Minimum acceptable brightness (default: 30, corresponding to L* ~ 11.5)
+ * @param maxBrightness - Maximum acceptable brightness (default: 225, corresponding to L* ~ 88.5)
+ * @returns Confidence result with level, diagnostic code, and diagnostic reasons
  */
 export function calculateConfidence(
   extractedRgb: RGB,
@@ -71,8 +70,9 @@ export function calculateConfidence(
   maxBrightness: number = 225
 ): ConfidenceResult {
   const reasons: string[] = [];
+  let diagnostic: LightingDiagnostic = 'good';
 
-  // Calculate brightness of extracted color
+  // Calculate brightness of extracted color (sRGB mean brightness)
   const brightness = (extractedRgb.r + extractedRgb.g + extractedRgb.b) / 3;
 
   // Calculate variance of sampled pixels
@@ -81,15 +81,18 @@ export function calculateConfidence(
   // Check variance threshold
   if (variance > varianceThreshold) {
     reasons.push(`High pixel variance (${variance.toFixed(0)} > ${varianceThreshold}) - region may have mixed lighting or span multiple objects`);
+    diagnostic = 'high_variance';
   }
 
-  // Check brightness thresholds
+  // Check brightness thresholds (aligned with L* < 12 and L* > 88.5 extreme bounds)
   if (brightness < minBrightness) {
     reasons.push(`Low brightness (${brightness.toFixed(1)} < ${minBrightness}) - region may be underexposed`);
+    if (diagnostic === 'good') diagnostic = 'underexposed';
   }
 
   if (brightness > maxBrightness) {
     reasons.push(`High brightness (${brightness.toFixed(1)} > ${maxBrightness}) - region may be overexposed or have specular highlights`);
+    if (diagnostic === 'good') diagnostic = 'overexposed';
   }
 
   // Determine confidence level
@@ -97,6 +100,7 @@ export function calculateConfidence(
 
   return {
     level,
+    diagnostic,
     variance,
     brightness,
     reasons

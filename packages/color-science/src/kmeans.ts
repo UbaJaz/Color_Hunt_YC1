@@ -78,38 +78,103 @@ export function calculateSizeFactor(sizeRatio: number): number {
     sizeFactor *= (ratio * ratio) * 0.5;
   }
   
-  // Penalty for overly large clusters (>80% of image)
-  // This helps when the background is overwhelmingly dominant
-  if (sizeRatio > 0.80) {
+  // Penalty for clusters that dominate ≥ 80% of the image.
+  // Uses >= (not >) so that hue-merged background pairs that sum to exactly 80%
+  // are also penalised. Without this, a merged 80% background avoids the penalty
+  // entirely and can outscore a 20% dark/light object whose lightness significance
+  // is the correct winner.
+  if (sizeRatio >= 0.80) {
     sizeFactor *= 0.5;
   }
   
   return sizeFactor;
 }
 
+// DESIGN DECISION: First-centroid seeding strategies for multi-run k-means.
+// Every run gets a DIFFERENT anchor pixel as its first centroid so that dark,
+// light, and low-chroma clusters all get at least one run where k-means can
+// cleanly separate them. Without this, runs that always seed on the
+// highest-chroma pixel never produce a clean cluster for achromatic dark or
+// light objects, so scoreCluster()'s lightness significance boost never fires
+// on a properly isolated centroid.
+export const enum SeedStrategy {
+  HighestChroma = 0, // Most colorful pixel — classic k-means++ anchor
+  DarkestPixel  = 1, // Lowest L — gives dark objects a seeding run
+  LightestPixel = 2, // Highest L — gives overexposed/light objects a seeding run
+  MaxSpread     = 3, // Pixel furthest from dataset mean — maximises initial spread
+}
+
 /**
- * Initialize k centroids using k-means++ with a deterministic seed
- * First centroid = highest chroma pixel (most colorful = likely the object)
+ * Pick the first centroid pixel according to the requested seeding strategy.
+ * The strategy rotates across k-means runs so that every run explores a
+ * different region of Lab space as its starting point.
  */
-function initializeCentroids(pixels: Lab[], k: number, seedOffset: number = 0): Lab[] {
+function pickFirstCentroid(pixels: Lab[], strategy: SeedStrategy): number {
+  switch (strategy) {
+    case SeedStrategy.DarkestPixel: {
+      let idx = 0, minL = Infinity;
+      for (let i = 0; i < pixels.length; i++) {
+        if (pixels[i].L < minL) { minL = pixels[i].L; idx = i; }
+      }
+      return idx;
+    }
+    case SeedStrategy.LightestPixel: {
+      let idx = 0, maxL = -Infinity;
+      for (let i = 0; i < pixels.length; i++) {
+        if (pixels[i].L > maxL) { maxL = pixels[i].L; idx = i; }
+      }
+      return idx;
+    }
+    case SeedStrategy.MaxSpread: {
+      // Compute dataset mean then pick the pixel furthest from it
+      let sumL = 0, sumA = 0, sumB = 0;
+      for (const p of pixels) { sumL += p.L; sumA += p.a; sumB += p.b; }
+      const n = pixels.length;
+      const mean: Lab = { L: sumL / n, a: sumA / n, b: sumB / n };
+      let idx = 0, maxDist = -1;
+      for (let i = 0; i < pixels.length; i++) {
+        const d = labDistance(pixels[i], mean);
+        if (d > maxDist) { maxDist = d; idx = i; }
+      }
+      return idx;
+    }
+    case SeedStrategy.HighestChroma:
+    default: {
+      let idx = 0, maxChroma = -1;
+      for (let i = 0; i < pixels.length; i++) {
+        const c = labChroma(pixels[i]);
+        if (c > maxChroma) { maxChroma = c; idx = i; }
+      }
+      return idx;
+    }
+  }
+}
+
+/**
+ * Initialize k centroids using k-means++ with a strategy-specific first anchor.
+ * @param pixels - Lab pixel array
+ * @param k - number of clusters
+ * @param strategy - which pixel to use as the first centroid seed
+ * @param kppOffset - deterministic offset for k-means++ subsequent centroid selection
+ */
+function initializeCentroids(
+  pixels: Lab[],
+  k: number,
+  strategy: SeedStrategy = SeedStrategy.HighestChroma,
+  kppOffset: number = 0
+): Lab[] {
   if (pixels.length === 0) return [];
   if (k <= 1) return [pixels[0]];
 
   const centroids: Lab[] = [];
 
-  // Deterministic first centroid: highest chroma pixel
-  let firstIndex = 0;
-  let maxChroma = -1;
-  for (let i = 0; i < pixels.length; i++) {
-    const chroma = labChroma(pixels[i]);
-    if (chroma > maxChroma) {
-      maxChroma = chroma;
-      firstIndex = i;
-    }
-  }
+  // First centroid chosen by the seeding strategy for this run
+  const firstIndex = pickFirstCentroid(pixels, strategy);
   centroids.push({ ...pixels[firstIndex] });
 
-  // k-means++ for remaining centroids
+  // k-means++ for remaining centroids: probabilistically pick pixels
+  // that are far from already-chosen centroids, using a deterministic offset
+  // so results are reproducible across runs.
   for (let i = 1; i < k; i++) {
     const distances = pixels.map(p => {
       const minDist = Math.min(...centroids.map(c => labDistance(p, c)));
@@ -117,8 +182,8 @@ function initializeCentroids(pixels: Lab[], k: number, seedOffset: number = 0): 
     });
 
     const totalDist = distances.reduce((sum, d) => sum + d, 0);
-    let target = ((totalDist / k) * (i + seedOffset)) % totalDist;
-    
+    let target = ((totalDist / k) * (i + kppOffset)) % totalDist;
+
     let selectedIndex = 0;
     let cumulative = 0;
     for (let j = 0; j < distances.length; j++) {
@@ -128,7 +193,7 @@ function initializeCentroids(pixels: Lab[], k: number, seedOffset: number = 0): 
         break;
       }
     }
-    
+
     centroids.push({ ...pixels[selectedIndex] });
   }
 
@@ -212,15 +277,18 @@ function hasConverged(oldCentroids: Lab[], newCentroids: Lab[], threshold: numbe
 }
 
 /**
- * Run a single k-means iteration
+ * Run a single k-means iteration with a given seeding strategy.
+ * @param strategy - which pixel to use as the first centroid seed
+ * @param kppOffset - deterministic offset for k-means++ subsequent centroid picks
  */
 function runKMeans(
   pixels: Lab[],
   k: number,
   maxIterations: number,
-  seedOffset: number
+  strategy: SeedStrategy,
+  kppOffset: number
 ): KMeansResult {
-  let centroids = initializeCentroids(pixels, k, seedOffset);
+  let centroids = initializeCentroids(pixels, k, strategy, kppOffset);
   let assignments: number[] = [];
 
   for (let iter = 0; iter < maxIterations; iter++) {
@@ -241,9 +309,8 @@ function runKMeans(
     clusterSizes[assignment]++;
   }
 
-  // AUDIT FIX: Don't pre-pick dominantIndex here. 
-  // Let the scoring logic evaluate all clusters.
-  // We'll set a default for backward compatibility.
+  // Default dominantIndex to highest-chroma cluster for backward compatibility.
+  // The real winner is chosen by scoreCluster() in extractDominantColor().
   const chromas = centroids.map(c => labChroma(c));
   const maxChromaIndex = chromas.indexOf(Math.max(...chromas));
 
@@ -266,7 +333,30 @@ function scoreCluster(result: KMeansResult, index: number): number {
   const totalSize = result.clusterSizes.reduce((a, b) => a + b, 0);
   const sizeRatio = size / totalSize;
   
-  const sizeFactor = calculateSizeFactor(sizeRatio);
+  // Mixed Lighting Sub-Cluster Merging (Day 8 Spec):
+  // Under split shadow/highlight lighting, a single object divides into sub-clusters of the same hue (Δh ≤ 30°).
+  // Merge size footprint ONLY when sub-clusters are of comparable size (|ratio_i - ratio_j| ≤ 0.25)
+  // and both are substantial (≥ 15% of region), indicating a true shadow/highlight split of one object.
+  let effectiveSize = size;
+  if (sizeRatio >= 0.15 && chroma >= 10) {
+    const currentHue = labHueAngle(centroid);
+    for (let j = 0; j < result.allCentroids.length; j++) {
+      if (j === index) continue;
+      const otherCentroid = result.allCentroids[j];
+      const otherSizeRatio = result.clusterSizes[j] / totalSize;
+      const otherChroma = labChroma(otherCentroid);
+      if (otherSizeRatio >= 0.15 && otherChroma >= 10 && Math.abs(sizeRatio - otherSizeRatio) <= 0.25) {
+        const otherHue = labHueAngle(otherCentroid);
+        const diff = Math.abs(currentHue - otherHue);
+        const hueDiff = Math.min(diff, 360 - diff);
+        if (hueDiff <= 30) {
+          effectiveSize += result.clusterSizes[j];
+        }
+      }
+    }
+  }
+  const effectiveSizeRatio = effectiveSize / totalSize;
+  const sizeFactor = calculateSizeFactor(effectiveSizeRatio);
   
   // Lightness Significance: For light/overexposed (L > 85) or dark (L < 25) low-chroma objects,
   // evaluate lightness contrast relative to mid-tone neutral (L=50) so valid light/dark objects
@@ -277,7 +367,7 @@ function scoreCluster(result: KMeansResult, index: number): number {
   }
   let significance = Math.max(chroma, lightnessSignificance);
 
-  // Specular Highlight Penalty: Small (< 8% of sampled area) bright glares (L > 90, low chroma)
+  // Specular Highlight Penalty: Small (< 8% of sampled area) bright glares (L > 90, low chroma < 15)
   // are reflections on glossy surfaces and should not win over the base object color.
   if (centroid.L > 90 && chroma < 15 && sizeRatio < 0.08) {
     significance *= 0.1;
@@ -308,10 +398,27 @@ export function extractDominantColor(
     throw new Error('Cannot extract color from empty pixel array');
   }
 
-  // Run k-means multiple times with different deterministic seeds
+  // Run k-means multiple times, each with a DIFFERENT first-centroid strategy.
+  // This ensures that dark, light, and low-chroma clusters all get at least one
+  // run where they are seeded as the starting anchor, giving scoreCluster()'s
+  // lightness significance boost a properly isolated centroid to evaluate.
+  //
+  // Strategy assignment across runs:
+  //   Run 0: HighestChroma — classic behavior, vivid objects
+  //   Run 1: DarkestPixel  — gives dark/low-chroma objects a dedicated run
+  //   Run 2: LightestPixel — gives overexposed/white objects a dedicated run
+  //   Run 3: MaxSpread     — maximises initial cluster separation
+  //   Run 4+: HighestChroma — fall back to classic for extra stability runs
+  const strategies: SeedStrategy[] = [
+    SeedStrategy.HighestChroma,
+    SeedStrategy.DarkestPixel,
+    SeedStrategy.LightestPixel,
+    SeedStrategy.MaxSpread,
+  ];
   const results: KMeansResult[] = [];
   for (let run = 0; run < numRuns; run++) {
-    results.push(runKMeans(pixels, k, maxIterations, run));
+    const strategy = strategies[run] ?? SeedStrategy.HighestChroma;
+    results.push(runKMeans(pixels, k, maxIterations, strategy, run));
   }
 
   // AUDIT FIX: Evaluate ALL clusters across ALL runs to find the global best.

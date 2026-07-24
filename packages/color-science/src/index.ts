@@ -32,7 +32,7 @@ export type { ExtractionResult } from './pipeline.js';
 
 // Confidence scoring (browser portable)
 export { calculateConfidence } from './confidence.js';
-export type { ConfidenceResult, ConfidenceLevel } from './confidence.js';
+export type { ConfidenceResult, ConfidenceLevel, LightingDiagnostic } from './confidence.js';
 
 // White-balance calibration (browser portable)
 export { estimateWhiteBalance, applyCalibration } from './calibration.js';
