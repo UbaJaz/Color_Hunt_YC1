@@ -268,9 +268,25 @@ function scoreCluster(result: KMeansResult, index: number): number {
   
   const sizeFactor = calculateSizeFactor(sizeRatio);
   
-  // Primary heuristic: Chroma * SizeFactor
-  // This balances colorfulness with representativeness.
-  return chroma * sizeFactor;
+  // Lightness Significance: For light/overexposed (L > 85) or dark (L < 25) low-chroma objects,
+  // evaluate lightness contrast relative to mid-tone neutral (L=50) so valid light/dark objects
+  // are not outvoted by colorful background noise.
+  let lightnessSignificance = 0;
+  if (centroid.L > 85 || centroid.L < 25) {
+    lightnessSignificance = Math.min(25, Math.abs(centroid.L - 50) * 0.5);
+  }
+  let significance = Math.max(chroma, lightnessSignificance);
+
+  // Specular Highlight Penalty: Small (< 8% of sampled area) bright glares (L > 90, low chroma)
+  // are reflections on glossy surfaces and should not win over the base object color.
+  if (centroid.L > 90 && chroma < 15 && sizeRatio < 0.08) {
+    significance *= 0.1;
+  }
+
+  // Perceptual Weighting: Significance^1.2 gives vivid colors appropriate weight over dull foliage/backgrounds
+  const perceptualWeight = Math.pow(significance, 1.2);
+  
+  return perceptualWeight * sizeFactor;
 }
 
 /**

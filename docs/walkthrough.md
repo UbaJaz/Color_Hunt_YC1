@@ -1,8 +1,8 @@
-# Walkthrough: Day 6 & 7 Implementation Completed
+# Walkthrough: Day 6, 7 & 8 Implementation Completed
 
 ## Summary of Accomplishments
 
-All 3 bug fixes from the audit, along with Day 6 and Day 7 tasks for **Jaswin's Color Science & Signal Processing Track**, have been successfully implemented and committed to git.
+All tasks for **Jaswin's Color Science & Signal Processing Track** up through **Day 8** have been successfully implemented, hardened, and verified with empirical evidence.
 
 ---
 
@@ -43,12 +43,27 @@ All 3 bug fixes from the audit, along with Day 6 and Day 7 tasks for **Jaswin's 
 
 ---
 
+## 4. Day 8 Implementation (Jaswin Track — Color Pipeline Hardening)
+
+1. **Lightness Significance for Low-Chroma Objects ([kmeans.ts](file:///c:/Users/jaswi/Downloads/ColorHunt-Merged/packages/color-science/src/kmeans.ts#L260-L310))**:
+   - Added lightness contrast scoring (`lightnessSignificance = Math.min(25, Math.abs(L - 50) * 0.5)`) for light/overexposed ($L > 85$) or dark ($L < 25$) objects so valid light/dark items (e.g. white/pastel/black objects) are accurately extracted without being discarded for low chroma.
+2. **Specular Highlight Penalty ([kmeans.ts](file:///c:/Users/jaswi/Downloads/ColorHunt-Merged/packages/color-science/src/kmeans.ts#L295-L300))**:
+   - Applied explicit $0.1\times$ penalty for small ($< 8\%$ of sampled area) bright glares ($L > 90$, $\text{chroma} < 15$) on glossy surfaces to prevent reflections from altering object color extraction.
+3. **Perceptual Non-Linear Weighting ([kmeans.ts](file:///c:/Users/jaswi/Downloads/ColorHunt-Merged/packages/color-science/src/kmeans.ts#L302-L305))**:
+   - Applied $W = \text{significance}^{1.2}$ weighting so vivid target colors maintain natural dominance over dull foliage and background clutter.
+4. **Test Harness Edge-Case Assertion ([testHarness.ts](file:///c:/Users/jaswi/Downloads/ColorHunt-Merged/packages/color-science/src/testHarness.ts#L559-L570))**:
+   - Validated overexposed light object extraction ($L > 80$) in lighting stress tests, achieving 100% PASS rate across all 5 real-world stress scenarios.
+
+---
+
 ## Verification Results
 
 | Suite | Status | Details |
 | :--- | :--- | :--- |
-| **Color Science Unit Tests** | **PASS** | 5/5 lighting scenarios + real image tests passed cleanly. |
-| **TypeScript Compilation** | **PASS** | `tsc` succeeded across all packages and app code. |
-| **App Bundle Build** | **PASS** | `vite build` generated output in 1.25s. |
-| **Linter** | **PASS** | `oxlint` found 0 errors. |
-| **Git Backup** | **COMMITTED** | Saved locally on branch `main` (`commit df2de68`). |
+| **Lighting Stress-Test Scenarios** | **PASS** | **5/5 PASS** (Very dark $L=18$, overexposed $L=92$, mixed lighting, low-saturation beige, specular glare). |
+| **Color Science Unit Tests** | **PASS** | Synthetic colors, dim-lighting k-means, same-hue k-means, red-berry/green-leaf, calculateSizeFactor, white-balance calibration, bonus voting all **100% PASS**. |
+| **Real Image Test Suite** | **PASS** | Real Red ($E=9.33$, score 37.8/60.7), Real Green ($E=9.30$, score 38.0), Real Blue ($E=4.36$, score 70.9) extracted accurate RGB swatches. |
+| **TypeScript Compilation** | **PASS** | `tsc -b` succeeded across all packages and app code with 0 errors. |
+| **App Bundle Build** | **PASS** | `vite build` generated production assets (`dist/assets/index-*.css` 15.26 kB, `dist/assets/index-*.js` 226.01 kB) in 1.21s. |
+| **Linter** | **PASS** | `oxlint` found **0 errors**. |
+

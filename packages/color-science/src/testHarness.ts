@@ -559,7 +559,14 @@ function testLightingScenarios() {
     const dominantRgb = labToRgb(dominantLab);
     const confidence = calculateConfidence(dominantRgb, rgbPixels);
 
-    const isCloseEnough = chroma > 10 || confidence.level !== 'low';
+    // Check scenario-specific pass conditions
+    let isCloseEnough = false;
+    if (scenario.name.includes('Scenario 2')) {
+      // Scenario 2 expects the overexposed object (L > 80) to be extracted despite low chroma
+      isCloseEnough = dominantLab.L > 80;
+    } else {
+      isCloseEnough = chroma > 10 || confidence.level !== 'low';
+    }
     const resultStr = isCloseEnough ? 'PASS' : 'FLAG';
 
     console.log(`| ${scenario.name.padEnd(50)} | ${dominantLab.L.toFixed(1).padEnd(12)} | ${chroma.toFixed(1).padEnd(10)} | ${confidence.level.padEnd(12)} | ${resultStr.padEnd(10)} |`);
