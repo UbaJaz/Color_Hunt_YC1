@@ -117,7 +117,7 @@ export function calculateConfidence(
     }
   }
 
-  if (brightness > maxBrightness) {
+  if (diagnostic === 'good' && brightness > maxBrightness) {
     // Distinguish between overexposed photo and valid light object
     // A valid light object has very high L* (> 90) and can have low chroma (white/pastels)
     if (lab.L > 90) {

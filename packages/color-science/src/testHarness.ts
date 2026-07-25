@@ -900,6 +900,19 @@ function testConfidenceDiagnostics() {
       expectedDiagnostic: 'good',
       expectedLevel: 'high'
     },
+    {
+      // Specular highlight: bright+achromatic extracted color, high-variance pixels
+      // 50 pixels at r=240 + 50 at r=160 => variance=1600 (>200), brightness=240 (>225), chroma≈0 (<15)
+      // Before fix: overwritten to valid_light_object (high). After fix: preserved as specular_highlight (low).
+      name: 'Specular highlight (overwrite guard)',
+      rgb: { r: 240, g: 240, b: 240 },
+      pixels: [
+        ...Array(50).fill({ r: 240, g: 240, b: 240 }),
+        ...Array(50).fill({ r: 160, g: 160, b: 160 }),
+      ],
+      expectedDiagnostic: 'specular_highlight',
+      expectedLevel: 'low'
+    },
   ];
 
   console.log('\n' + '-'.repeat(80));
