@@ -17,9 +17,10 @@
 //   - kmeans.ts boosts individual cluster scores for dark/light OBJECTS within the photo.
 
 import { RGB } from './types.js';
+import { rgbToLab } from './colorConversion.js';
 
 export type ConfidenceLevel = 'high' | 'low';
-export type LightingDiagnostic = 'good' | 'underexposed' | 'overexposed' | 'high_variance';
+export type LightingDiagnostic = 'good' | 'underexposed' | 'overexposed' | 'high_variance' | 'specular_highlight' | 'valid_dark_object' | 'valid_light_object';
 
 export interface ConfidenceResult {
   level: ConfidenceLevel;
@@ -55,6 +56,9 @@ function calculatePixelVariance(pixels: RGB[]): number {
 /**
  * Calculate confidence score for a color extraction.
  * 
+ * Enhanced with granular diagnostics to distinguish valid dark/light objects
+ * from bad photo exposure conditions.
+ * 
  * @param extractedRgb - The final extracted RGB color
  * @param sampledPixels - The RGB pixels from the sampled region
  * @param varianceThreshold - Maximum acceptable variance (default: 2000)
@@ -78,25 +82,64 @@ export function calculateConfidence(
   // Calculate variance of sampled pixels
   const variance = calculatePixelVariance(sampledPixels);
 
-  // Check variance threshold
-  if (variance > varianceThreshold) {
+  // Convert extracted RGB to Lab to check object properties
+  const lab = rgbToLab(extractedRgb);
+  const chroma = Math.sqrt(lab.a * lab.a + lab.b * lab.b);
+
+  // Check for specular highlights (bright, low-chroma, high variance)
+  // This indicates a glossy reflection rather than a valid object color
+  // Check this BEFORE high variance to prioritize specular detection
+  if (brightness > maxBrightness && chroma < 15 && variance > 200) {
+    reasons.push(`Specular highlight detected (high brightness ${brightness.toFixed(1)}, low chroma ${chroma.toFixed(1)}) - glossy reflection, not object color`);
+    diagnostic = 'specular_highlight';
+  } else if (variance > varianceThreshold) {
     reasons.push(`High pixel variance (${variance.toFixed(0)} > ${varianceThreshold}) - region may have mixed lighting or span multiple objects`);
     diagnostic = 'high_variance';
   }
 
-  // Check brightness thresholds (aligned with L* < 12 and L* > 88.5 extreme bounds)
+  // Check brightness thresholds with object-aware diagnostics
   if (brightness < minBrightness) {
-    reasons.push(`Low brightness (${brightness.toFixed(1)} < ${minBrightness}) - region may be underexposed`);
-    if (diagnostic === 'good') diagnostic = 'underexposed';
+    // Distinguish between underexposed photo and valid dark object
+    // A valid dark object has very low L* (< 15) and low chroma, indicating a genuinely dark object
+    if (lab.L < 15 && chroma < 15) {
+      // This is likely a valid dark object (black, dark gray, etc.)
+      // Check if variance is reasonable for a solid dark object
+      if (variance < varianceThreshold) {
+        reasons.push(`Valid dark object detected (L*=${lab.L.toFixed(1)}, chroma=${chroma.toFixed(1)}) - object is genuinely dark`);
+        diagnostic = 'valid_dark_object';
+      } else {
+        reasons.push(`Low brightness (${brightness.toFixed(1)} < ${minBrightness}) - region may be underexposed`);
+        diagnostic = 'underexposed';
+      }
+    } else {
+      reasons.push(`Low brightness (${brightness.toFixed(1)} < ${minBrightness}) - region may be underexposed`);
+      diagnostic = 'underexposed';
+    }
   }
 
   if (brightness > maxBrightness) {
-    reasons.push(`High brightness (${brightness.toFixed(1)} > ${maxBrightness}) - region may be overexposed or have specular highlights`);
-    if (diagnostic === 'good') diagnostic = 'overexposed';
+    // Distinguish between overexposed photo and valid light object
+    // A valid light object has very high L* (> 90) and can have low chroma (white/pastels)
+    if (lab.L > 90) {
+      // This is likely a valid light object (white, pastel, etc.)
+      // Check if variance is reasonable for a solid light object
+      if (variance < varianceThreshold) {
+        reasons.push(`Valid light object detected (L*=${lab.L.toFixed(1)}, chroma=${chroma.toFixed(1)}) - object is genuinely light`);
+        diagnostic = 'valid_light_object';
+      } else {
+        reasons.push(`High brightness (${brightness.toFixed(1)} > ${maxBrightness}) - region may be overexposed`);
+        diagnostic = 'overexposed';
+      }
+    } else {
+      reasons.push(`High brightness (${brightness.toFixed(1)} > ${maxBrightness}) - region may be overexposed or have specular highlights`);
+      diagnostic = 'overexposed';
+    }
   }
 
   // Determine confidence level
-  const level: ConfidenceLevel = reasons.length > 0 ? 'low' : 'high';
+  // Valid dark/light objects and good conditions are high confidence
+  // Underexposed, overexposed, specular highlights, and high variance are low confidence
+  const level: ConfidenceLevel = (diagnostic === 'good' || diagnostic === 'valid_dark_object' || diagnostic === 'valid_light_object') ? 'high' : 'low';
 
   return {
     level,

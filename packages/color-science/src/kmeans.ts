@@ -335,8 +335,23 @@ function scoreCluster(result: KMeansResult, index: number): number {
   
   // Mixed Lighting Sub-Cluster Merging (Day 8 Spec):
   // Under split shadow/highlight lighting, a single object divides into sub-clusters of the same hue (Δh ≤ 30°).
-  // Merge size footprint ONLY when sub-clusters are of comparable size (|ratio_i - ratio_j| ≤ 0.25)
+  // Merge size footprint ONLY when sub-clusters are of comparable size (|ratio_i - ratio_j| ≤ 0.25),
+  // comparable chroma (a true shadow/highlight split of one surface changes L, not saturation, much),
   // and both are substantial (≥ 15% of region), indicating a true shadow/highlight split of one object.
+  //
+  // CS-001 root cause (confirmed via instrumented run during Day 9 investigation):
+  // k-means sometimes splits ONE large, comparably-sized cluster (e.g. an 83%-of-frame dull-orange
+  // background) into two noisy halves of similar size. A separate, small, genuinely more saturated
+  // object (e.g. a 17% vivid-orange object) can coincidentally fall within the size-proximity and
+  // hue-proximity windows of one of those halves purely by chance of how k-means split the larger
+  // cluster — even though it is not a lighting split of the same physical surface. Without a chroma
+  // check, that small vivid cluster's effective size got inflated by merging with a half of the
+  // unrelated large cluster, which pushed its size factor above the small-cluster penalty entirely
+  // and let it outscore the true dominant color. Requiring the two candidate clusters' chroma to be
+  // within a shadow/highlight-plausible range (ratio ≤ 1.6, i.e. at most 60% more saturated) preserves
+  // the legitimate shadow/highlight merges (Scenario 3, dim-lighting split) while blocking merges with
+  // a distinctly more saturated, unrelated object.
+  const CHROMA_PROXIMITY_MAX_RATIO = 1.6;
   let effectiveSize = size;
   if (sizeRatio >= 0.15 && chroma >= 10) {
     const currentHue = labHueAngle(centroid);
@@ -349,7 +364,8 @@ function scoreCluster(result: KMeansResult, index: number): number {
         const otherHue = labHueAngle(otherCentroid);
         const diff = Math.abs(currentHue - otherHue);
         const hueDiff = Math.min(diff, 360 - diff);
-        if (hueDiff <= 30) {
+        const chromaRatio = Math.max(chroma, otherChroma) / Math.min(chroma, otherChroma);
+        if (hueDiff <= 30 && chromaRatio <= CHROMA_PROXIMITY_MAX_RATIO) {
           effectiveSize += result.clusterSizes[j];
         }
       }
@@ -375,7 +391,7 @@ function scoreCluster(result: KMeansResult, index: number): number {
 
   // Perceptual Weighting: Significance^1.2 gives vivid colors appropriate weight over dull foliage/backgrounds
   const perceptualWeight = Math.pow(significance, 1.2);
-  
+
   return perceptualWeight * sizeFactor;
 }
 
