@@ -10,6 +10,7 @@ import { RGB, Lab } from './types.js';
 import { estimateWhiteBalance, applyCalibration } from './calibration.js';
 import { calculateBonusMultiplier, VoteTally } from './bonusVoting.js';
 import { calculateConfidence } from './confidence.js';
+import { getRarityTier, isSuccessfulUnlock } from './rarity.js';
 import path from 'path';
 import { fileURLToPath } from 'url';
 
@@ -748,6 +749,185 @@ function testLowChromaDarkObject() {
 }
 
 /**
+ * Test rarity tier classification across the full spectrum
+ */
+function testRarityTierClassification() {
+  console.log('\n' + '='.repeat(80));
+  console.log('RARITY TIER CLASSIFICATION TEST');
+  console.log('='.repeat(80));
+  console.log('Testing getRarityTier() with representative colors from each tier');
+  console.log('='.repeat(80));
+
+  const testCases: { name: string; rgb: RGB; expectedTier: string }[] = [
+    // Common: vivid, mid-tone colors with moderate chroma
+    { name: 'Forest Green (Rare)', rgb: { r: 34, g: 139, b: 34 }, expectedTier: 'rare' },
+    { name: 'Emerald Green (Common)', rgb: { r: 46, g: 139, b: 87 }, expectedTier: 'common' },
+    { name: 'Cadet Blue (Uncommon)', rgb: { r: 95, g: 158, b: 160 }, expectedTier: 'uncommon' },
+    
+    // Uncommon: moderate chroma or unusual tones
+    { name: 'Teal (Common)', rgb: { r: 0, g: 128, b: 128 }, expectedTier: 'common' },
+    { name: 'Lavender (Uncommon)', rgb: { r: 230, g: 230, b: 250 }, expectedTier: 'uncommon' },
+    { name: 'Sage Green (Uncommon)', rgb: { r: 144, g: 238, b: 144 }, expectedTier: 'uncommon' },
+    
+    // Rare: very high chroma or extreme lightness
+    { name: 'Crimson (Rare)', rgb: { r: 220, g: 20, b: 60 }, expectedTier: 'rare' },
+    { name: 'Royal Blue (Rare)', rgb: { r: 65, g: 105, b: 225 }, expectedTier: 'rare' },
+    { name: 'Fluorescent Pink (Rare)', rgb: { r: 255, g: 20, b: 147 }, expectedTier: 'rare' },
+    { name: 'Metallic Gold (Common)', rgb: { r: 212, g: 175, b: 55 }, expectedTier: 'common' },
+    { name: 'Coral (Rare)', rgb: { r: 255, g: 127, b: 80 }, expectedTier: 'rare' },
+    
+    // Ultra-rare: near-achromatic mid-tones or extreme extremes
+    { name: 'Pure White (Ultra-Rare)', rgb: { r: 255, g: 255, b: 255 }, expectedTier: 'ultra-rare' },
+    { name: 'Pure Black (Ultra-Rare)', rgb: { r: 0, g: 0, b: 0 }, expectedTier: 'ultra-rare' },
+    { name: 'Neutral Gray (Ultra-Rare)', rgb: { r: 128, g: 128, b: 128 }, expectedTier: 'ultra-rare' },
+    { name: 'Bright Yellow (Rare)', rgb: { r: 255, g: 255, b: 0 }, expectedTier: 'rare' },
+    { name: 'Very Dark (Ultra-Rare)', rgb: { r: 10, g: 10, b: 10 }, expectedTier: 'ultra-rare' },
+  ];
+
+  console.log('\n' + '-'.repeat(80));
+  console.log(`| ${'Color Name'.padEnd(30)} | ${'RGB'.padEnd(18)} | ${'L'.padEnd(6)} | ${'Chroma'.padEnd(8)} | ${'Expected'.padEnd(15)} | ${'Actual'.padEnd(15)} | ${'Match'.padEnd(6)} |`);
+  console.log('-'.repeat(80));
+
+  let passCount = 0;
+  for (const tc of testCases) {
+    const lab = rgbToLab(tc.rgb);
+    const chroma = Math.sqrt(lab.a * lab.a + lab.b * lab.b);
+    const actualTier = getRarityTier(tc.rgb);
+    const match = actualTier === tc.expectedTier ? '✓' : '✗';
+    if (match === '✓') passCount++;
+    
+    const rgbStr = `(${tc.rgb.r},${tc.rgb.g},${tc.rgb.b})`;
+    console.log(`| ${tc.name.padEnd(30)} | ${rgbStr.padEnd(18)} | ${lab.L.toFixed(1).padEnd(6)} | ${chroma.toFixed(1).padEnd(8)} | ${tc.expectedTier.padEnd(15)} | ${actualTier.padEnd(15)} | ${match.padEnd(6)} |`);
+  }
+
+  console.log('-'.repeat(80));
+  console.log(`Result: ${passCount}/${testCases.length} tests passed`);
+  if (passCount === testCases.length) {
+    console.log('✓ PASS: All rarity tiers classified correctly');
+  } else {
+    console.log('✗ FAIL: Some rarity tiers misclassified');
+  }
+  console.log('-'.repeat(80));
+}
+
+/**
+ * Test successful unlock logic
+ */
+function testSuccessfulUnlockLogic() {
+  console.log('\n' + '='.repeat(80));
+  console.log('SUCCESSFUL UNLOCK LOGIC TEST');
+  console.log('='.repeat(80));
+  console.log('Testing isSuccessfulUnlock() with score and confidence combinations');
+  console.log('='.repeat(80));
+
+  const testCases: { score: number; confidence: string; expected: string; description: string }[] = [
+    { score: 85, confidence: 'high', expected: 'true', description: 'High score, high confidence' },
+    { score: 80, confidence: 'high', expected: 'true', description: 'Above threshold, high confidence' },
+    { score: 75, confidence: 'high', expected: 'true', description: 'At threshold, high confidence' },
+    { score: 74, confidence: 'high', expected: 'false', description: 'Below threshold, high confidence' },
+    { score: 90, confidence: 'low', expected: 'false', description: 'High score, low confidence (bad lighting)' },
+    { score: 85, confidence: 'low', expected: 'false', description: 'Above threshold, low confidence' },
+    { score: 50, confidence: 'high', expected: 'false', description: 'Low score, high confidence' },
+    { score: 50, confidence: 'low', expected: 'false', description: 'Low score, low confidence' },
+  ];
+
+  console.log('\n' + '-'.repeat(80));
+  console.log(`| ${'Description'.padEnd(40)} | ${'Score'.padEnd(8)} | ${'Confidence'.padEnd(12)} | ${'Expected'.padEnd(10)} | ${'Actual'.padEnd(10)} | ${'Match'.padEnd(6)} |`);
+  console.log('-'.repeat(80));
+
+  let passCount = 0;
+  for (const tc of testCases) {
+    const actual = isSuccessfulUnlock(tc.score, tc.confidence as any).toString();
+    const match = actual === tc.expected ? '✓' : '✗';
+    if (match === '✓') passCount++;
+    
+    console.log(`| ${tc.description.padEnd(40)} | ${tc.score.toString().padEnd(8)} | ${tc.confidence.padEnd(12)} | ${tc.expected.padEnd(10)} | ${actual.padEnd(10)} | ${match.padEnd(6)} |`);
+  }
+
+  console.log('-'.repeat(80));
+  console.log(`Result: ${passCount}/${testCases.length} tests passed`);
+  if (passCount === testCases.length) {
+    console.log('✓ PASS: All unlock logic tests passed');
+  } else {
+    console.log('✗ FAIL: Some unlock logic tests failed');
+  }
+  console.log('-'.repeat(80));
+}
+
+/**
+ * Test confidence diagnostics with granular object detection
+ */
+function testConfidenceDiagnostics() {
+  console.log('\n' + '='.repeat(80));
+  console.log('CONFIDENCE DIAGNOSTICS TEST (Granular object detection)');
+  console.log('='.repeat(80));
+  console.log('Testing enhanced calculateConfidence() with valid dark/light object detection');
+  console.log('='.repeat(80));
+
+  const testCases: { name: string; rgb: RGB; pixels: RGB[]; expectedDiagnostic: string; expectedLevel: string }[] = [
+    { 
+      name: 'Valid dark object (black)', 
+      rgb: { r: 10, g: 10, b: 10 }, 
+      pixels: Array(100).fill({ r: 10, g: 10, b: 10 }),
+      expectedDiagnostic: 'valid_dark_object',
+      expectedLevel: 'high'
+    },
+    { 
+      name: 'Valid light object (white)', 
+      rgb: { r: 255, g: 255, b: 255 }, 
+      pixels: Array(100).fill({ r: 255, g: 255, b: 255 }),
+      expectedDiagnostic: 'valid_light_object',
+      expectedLevel: 'high'
+    },
+    { 
+      name: 'Dark object (low L*)', 
+      rgb: { r: 20, g: 20, b: 20 }, 
+      pixels: Array(100).fill({ r: 20, g: 20, b: 20 }),
+      expectedDiagnostic: 'valid_dark_object',
+      expectedLevel: 'high'
+    },
+    { 
+      name: 'Light object (high L*)', 
+      rgb: { r: 240, g: 240, b: 240 }, 
+      pixels: Array(100).fill({ r: 240, g: 240, b: 240 }),
+      expectedDiagnostic: 'valid_light_object',
+      expectedLevel: 'high'
+    },
+    { 
+      name: 'Good conditions (mid-tone)', 
+      rgb: { r: 128, g: 128, b: 128 }, 
+      pixels: Array(100).fill({ r: 128, g: 128, b: 128 }),
+      expectedDiagnostic: 'good',
+      expectedLevel: 'high'
+    },
+  ];
+
+  console.log('\n' + '-'.repeat(80));
+  console.log(`| ${'Test Case'.padEnd(30)} | ${'Expected Diag'.padEnd(20)} | ${'Actual Diag'.padEnd(20)} | ${'Expected Level'.padEnd(15)} | ${'Actual Level'.padEnd(15)} | ${'Match'.padEnd(6)} |`);
+  console.log('-'.repeat(80));
+
+  let passCount = 0;
+  for (const tc of testCases) {
+    const result = calculateConfidence(tc.rgb, tc.pixels);
+    const diagMatch = result.diagnostic === tc.expectedDiagnostic ? '✓' : '✗';
+    const levelMatch = result.level === tc.expectedLevel ? '✓' : '✗';
+    const match = (diagMatch === '✓' && levelMatch === '✓') ? '✓' : '✗';
+    if (match === '✓') passCount++;
+    
+    console.log(`| ${tc.name.padEnd(30)} | ${tc.expectedDiagnostic.padEnd(20)} | ${result.diagnostic.padEnd(20)} | ${tc.expectedLevel.padEnd(15)} | ${result.level.padEnd(15)} | ${match.padEnd(6)} |`);
+  }
+
+  console.log('-'.repeat(80));
+  console.log(`Result: ${passCount}/${testCases.length} tests passed`);
+  if (passCount === testCases.length) {
+    console.log('✓ PASS: All confidence diagnostics tests passed');
+  } else {
+    console.log('✗ FAIL: Some confidence diagnostics tests failed');
+  }
+  console.log('-'.repeat(80));
+}
+
+/**
  * Main test function
  */
 async function main() {
@@ -764,6 +944,9 @@ async function main() {
   testBonusVoting();
   testLowChromaDarkObject();
   testLightingScenarios();
+  testRarityTierClassification();
+  testSuccessfulUnlockLogic();
+  testConfidenceDiagnostics();
 
   const imagePaths: { path: string; name: string }[] = [
     { path: path.resolve(projectRoot, 'test-images/real-red.jpeg'), name: 'Real Red Object' },
