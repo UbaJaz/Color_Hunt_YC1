@@ -103,6 +103,9 @@ Previously, a glossy specular highlight (high brightness, low chroma, high pixel
 ### iOS Safari camera — real-device walkthrough not yet done
 `getUserMedia` camera permission + capture flow has been coded defensively (see iOS Safari notes below) but has NOT been manually tested on a physical iPhone in Safari. This is the single biggest unverified risk on the platform.
 
+### Color extraction under glare
+Color extraction on glossy/reflective real-world objects can be skewed by specular highlights covering a large portion of the tapped region — confirmed via debug telemetry showing raw sampled average diverging sharply from the extracted color when the dominant k-means cluster is itself a highlight rather than the object's base color. Mitigated for now by capturing on matte surfaces / avoiding direct glare on the tapped spot. Proper fix (e.g. highlight-aware region re-sampling) is out of scope before submission.
+
 ---
 
 ## Setup and run

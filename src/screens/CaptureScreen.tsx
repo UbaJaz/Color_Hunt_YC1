@@ -4,7 +4,7 @@ import { CaptureButton } from '../components/camera/CaptureButton';
 import { PhotoPreview } from '../components/camera/PhotoPreview';
 import { TargetColorBanner } from '../components/camera/TargetColorBanner';
 import { useGameState } from '../state/GameStateContext';
-import { extractColorFromCanvas, rgbToLab, deltaE2000, deltaEToScore, calculateConfidence, selectRegion } from '@color-science';
+import { extractColorFromCanvas, rgbToLab, deltaE2000, calculateConfidence, selectRegion } from '@color-science';
 import type { CapturedPhoto } from '../types/capture';
 import type { TapSelection } from '../hooks/useTapSelection';
 import { Timer } from '../components/ui/Timer';
@@ -66,7 +66,11 @@ export function CaptureScreen({ onRoundResultReady }: CaptureScreenProps) {
 
       const targetLab = rgbToLab(currentRound.targetColor.rgb);
       const deltaE = deltaE2000(extraction.extractedLab, targetLab);
-      const score = deltaEToScore(deltaE);
+      // Game-layer scoring: more forgiving than deltaEToScore (normFactor=15 which
+      // floors to 0 at deltaE>=15). Real captures routinely hit deltaE 20-50, giving
+      // all-zero scores. Formula: 100 - deltaE, floored at 0.
+      // Example outcomes: deltaE 5 → 95 pts, deltaE 30 → 70 pts, deltaE 80 → 20 pts, deltaE 100+ → 0 pts.
+      const gameScore = Math.max(0, Math.round(100 - deltaE));
 
       const confidence = calculateConfidence(extraction.extractedRgb, extraction.sampledPixels);
 
@@ -75,7 +79,7 @@ export function CaptureScreen({ onRoundResultReady }: CaptureScreenProps) {
         region: extraction.region,
         extractedRgb: extraction.extractedRgb,
         deltaE,
-        score,
+        score: gameScore,
         confidence,
         bonusVotes: null,
         finalScore: null,
