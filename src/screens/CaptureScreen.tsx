@@ -79,6 +79,17 @@ export function CaptureScreen({ onRoundResultReady }: CaptureScreenProps) {
         confidence,
         bonusVotes: null,
         finalScore: null,
+        debugData: {
+          naturalPoint: selection.naturalPoint,
+          region: extraction.region,
+          rawAverageRgb: extraction.rawAverageRgb,
+          dominantClusterLab: extraction.dominantClusterLab,
+          dominantClusterRgb: extraction.dominantClusterRgb,
+          allClusterSizes: extraction.allClusterSizes,
+          extractedRgb: extraction.extractedRgb,
+          confidenceLevel: confidence.level,
+          confidenceReasons: confidence.reasons,
+        },
       });
 
       onRoundResultReady();
@@ -97,7 +108,7 @@ export function CaptureScreen({ onRoundResultReady }: CaptureScreenProps) {
   const handleTimeExpire = useCallback(() => {
     const video = videoElRef.current;
     const canvas = canvasRef.current;
-    if (!video || !canvas || !videoReady) return;
+    if (!video || !canvas || !videoReady || !player) return;
 
     canvas.width = video.videoWidth;
     canvas.height = video.videoHeight;
@@ -114,9 +125,9 @@ export function CaptureScreen({ onRoundResultReady }: CaptureScreenProps) {
       naturalRegion: region,
       displayRegion: region,
     });
-  }, [videoReady, handleConfirmSelection]);
+  }, [videoReady, player, handleConfirmSelection]);
 
-  if (!currentRound) return null;
+  if (!currentRound || !player) return null;
 
   return (
     <div className="flex h-full w-full flex-col">

@@ -140,6 +140,28 @@ export function ResultsScreen({ onContinue, onRetake }: ResultsScreenProps) {
       <button onClick={handleContinue} className="mt-4 rounded-full bg-white px-8 py-3 text-sm font-bold text-neutral-900 transition-transform active:scale-95">
         Continue
       </button>
+
+      {/* Monospace debug overlay when ?debug=1 is set */}
+      {typeof window !== 'undefined' &&
+        (new URLSearchParams(window.location.search).has('debug') || window.location.search.includes('debug=1')) &&
+        result.debugData && (
+          <div className="w-full max-w-sm rounded-xl bg-black/90 border border-neutral-700 p-4 font-mono text-[11px] text-green-400 space-y-1 overflow-x-auto">
+            <p className="font-bold text-white uppercase tracking-wider text-xs border-b border-neutral-700 pb-1">
+              === Color Science Telemetry Debug ===
+            </p>
+            <p>Tap Pixel: x={Math.round(result.debugData.naturalPoint.x)}, y={Math.round(result.debugData.naturalPoint.y)}</p>
+            <p>Region Bounds: x={result.debugData.region.x}, y={result.debugData.region.y}, w={result.debugData.region.width}, h={result.debugData.region.height}</p>
+            <p>Raw Avg RGB: ({result.debugData.rawAverageRgb.r}, {result.debugData.rawAverageRgb.g}, {result.debugData.rawAverageRgb.b})</p>
+            <p>Dominant Lab: L={result.debugData.dominantClusterLab.L.toFixed(1)}, a={result.debugData.dominantClusterLab.a.toFixed(1)}, b={result.debugData.dominantClusterLab.b.toFixed(1)}</p>
+            <p>Dominant RGB: ({result.debugData.dominantClusterRgb.r}, {result.debugData.dominantClusterRgb.g}, {result.debugData.dominantClusterRgb.b})</p>
+            <p>Cluster Sizes: [{result.debugData.allClusterSizes.join(', ')}]</p>
+            <p>Extracted RGB: ({result.debugData.extractedRgb.r}, {result.debugData.extractedRgb.g}, {result.debugData.extractedRgb.b})</p>
+            <p>Confidence Level: {result.debugData.confidenceLevel.toUpperCase()}</p>
+            {result.debugData.confidenceReasons.length > 0 && (
+              <p>Confidence Reasons: {result.debugData.confidenceReasons.join('; ')}</p>
+            )}
+          </div>
+        )}
     </div>
   );
 }

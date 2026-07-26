@@ -1,10 +1,22 @@
 import type { RGB, Region, TargetColor, Difficulty } from './color';
-import type { ConfidenceResult, CalibrationMatrix } from '@color-science';
+import type { ConfidenceResult, CalibrationMatrix, Lab } from '@color-science';
 
 export interface Player {
   id: string;
   name: string;
   totalScore: number;
+}
+
+export interface ExtractionDebugData {
+  naturalPoint: { x: number; y: number };
+  region: Region;
+  rawAverageRgb: RGB;
+  dominantClusterLab: Lab;
+  dominantClusterRgb: RGB;
+  allClusterSizes: number[];
+  extractedRgb: RGB;
+  confidenceLevel: string;
+  confidenceReasons: string[];
 }
 
 /**
@@ -37,6 +49,7 @@ export interface RoundResult {
   confidence: ConfidenceResult | null;
   bonusVotes: { thumbsUp: number; thumbsDown: number } | null;
   finalScore: number | null;
+  debugData?: ExtractionDebugData | null;
 }
 
 export interface Round {

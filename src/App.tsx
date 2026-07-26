@@ -29,8 +29,8 @@ function AppShell() {
   };
 
   const handleNextPlayerTurnOrVoting = () => {
-    // If there are more players in this round, go back to capture screen
-    if (currentRound && currentRound.currentPlayerIndex < state.players.length) {
+    // Check if there is another player after current turn advances
+    if (currentRound && currentRound.currentPlayerIndex + 1 < state.players.length) {
       setScreen('capture');
     } else {
       // Everyone has played, go to voting

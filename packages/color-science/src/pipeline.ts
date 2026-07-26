@@ -16,6 +16,10 @@ export interface ExtractionResult {
   totalPixelsSampled: number;
   region: Region;
   sampledPixels: RGB[];
+  rawAverageRgb: RGB;
+  dominantClusterLab: Lab;
+  dominantClusterRgb: RGB;
+  allClusterSizes: number[];
 }
 
 /**
@@ -65,6 +69,18 @@ export function extractColorFromCanvas(
   // NOTE: getPixelsFromRegion on the ImageData sub-region starts at (0,0)
   // because ctx.getImageData() already cropped to the region
 
+  // Compute raw average RGB before calibration/k-means
+  const sumRgb = rgbPixels.reduce(
+    (acc, p) => ({ r: acc.r + p.r, g: acc.g + p.g, b: acc.b + p.b }),
+    { r: 0, g: 0, b: 0 }
+  );
+  const totalCount = rgbPixels.length || 1;
+  const rawAverageRgb: RGB = {
+    r: Math.round(sumRgb.r / totalCount),
+    g: Math.round(sumRgb.g / totalCount),
+    b: Math.round(sumRgb.b / totalCount),
+  };
+
   // 4.5 Apply calibration BEFORE converting to Lab, if provided
   if (calibration) {
     rgbPixels = rgbPixels.map(rgb => applyCalibration(rgb, calibration));
@@ -94,6 +110,10 @@ export function extractColorFromCanvas(
     dominantClusterSize: dominantClusterPixels.length,
     totalPixelsSampled: rgbPixels.length,
     region,
-    sampledPixels: rgbPixels
+    sampledPixels: rgbPixels,
+    rawAverageRgb,
+    dominantClusterLab: kmeansResult.centroid,
+    dominantClusterRgb: labToRgb(kmeansResult.centroid),
+    allClusterSizes: kmeansResult.clusterSizes,
   };
 }
