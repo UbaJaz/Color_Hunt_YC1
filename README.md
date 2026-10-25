@@ -134,3 +134,7 @@ The following items were intentionally deferred and are not silently dropped:
 ---
 
 The full test and verification log is in [docs/VERIFICATION.md](docs/VERIFICATION.md).
+
+## License
+
+MIT, see [LICENSE](LICENSE).
