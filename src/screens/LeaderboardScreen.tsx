@@ -25,7 +25,7 @@ export function LeaderboardScreen({ onNextRound }: { onNextRound: () => void }) 
         <div>
           <h2 className="text-sm uppercase tracking-wider text-neutral-400 mb-4 text-center">Round {currentRound.roundNumber} Results</h2>
           <div className="flex flex-col gap-3">
-            {currentRound.results.sort((a,b) => (b.finalScore || 0) - (a.finalScore || 0)).map(result => {
+            {[...currentRound.results].sort((a,b) => (b.finalScore || 0) - (a.finalScore || 0)).map(result => {
               const player = state.players.find(p => p.id === result.playerId);
               if (!player) return null;
               

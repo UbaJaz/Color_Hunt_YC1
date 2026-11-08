@@ -14,9 +14,10 @@ const DIFFICULTY_OPTIONS: { label: string; value: Difficulty; description: strin
 ];
 
 const ROUND_OPTIONS = [3, 5, 7];
+const MAX_PLAYERS = 8;
 
 export function LobbyScreen({ onStartGame }: LobbyScreenProps) {
-  const { state, addPlayer } = useGameState();
+  const { state, addPlayer, removePlayer } = useGameState();
   const [name, setName] = useState('');
 
   // Game settings state — lives here until the host taps Start
@@ -26,8 +27,10 @@ export function LobbyScreen({ onStartGame }: LobbyScreenProps) {
 
   const handleAddPlayer = (e: React.FormEvent) => {
     e.preventDefault();
-    if (name.trim()) {
-      addPlayer(name.trim());
+    const trimmed = name.trim();
+    const duplicate = state.players.some(p => p.name.toLowerCase() === trimmed.toLowerCase());
+    if (trimmed && !duplicate && state.players.length < MAX_PLAYERS) {
+      addPlayer(trimmed);
       setName('');
     }
   };
@@ -53,7 +56,8 @@ export function LobbyScreen({ onStartGame }: LobbyScreenProps) {
             state.players.map((p, i) => (
               <li key={p.id} className="flex items-center gap-3 rounded-lg bg-white/10 px-4 py-2">
                 <span className="text-neutral-400 text-sm font-mono">{i + 1}</span>
-                <span>{p.name}</span>
+                <span className="flex-1">{p.name}</span>
+                <button onClick={() => removePlayer(p.id)} aria-label={`Remove ${p.name}`} className="px-2 text-neutral-400">✕</button>
               </li>
             ))
           )}

@@ -7,7 +7,9 @@ type Action =
   | { type: 'START_GAME'; payload: GameSettings }
   | { type: 'START_ROUND' }
   | { type: 'RECORD_RESULT'; payload: RoundResult }
-  | { type: 'ADD_PLAYER'; payload: { name: string } }
+  | { type: 'ADD_PLAYER'; payload: { id: string; name: string } }
+  | { type: 'REMOVE_PLAYER'; payload: { id: string } }
+  | { type: 'RESET_GAME' }
   | { type: 'NEXT_TURN' }
   | { type: 'SET_CALIBRATION_MATRIX'; payload: CalibrationMatrix }
   | { type: 'RECORD_VOTES'; payload: { resultsWithVotes: RoundResult[] } };
@@ -77,11 +79,18 @@ function reducer(state: GameState, action: Action): GameState {
     }
     case 'ADD_PLAYER': {
       const player: Player = {
-        id: `player-${state.players.length + 1}`,
+        id: action.payload.id,
         name: action.payload.name,
         totalScore: 0,
       };
       return { ...state, players: [...state.players, player] };
+    }
+    case 'REMOVE_PLAYER': {
+      return { ...state, players: state.players.filter(p => p.id !== action.payload.id) };
+    }
+    case 'RESET_GAME': {
+      // Play Again: keep players and calibration, wipe scores, rounds and settings.
+      return { ...state, players: state.players.map(p => ({ ...p, totalScore: 0 })), rounds: [], settings: null };
     }
     case 'NEXT_TURN': {
       const rounds = state.rounds.slice();
@@ -97,6 +106,8 @@ function reducer(state: GameState, action: Action): GameState {
       const rounds = state.rounds.slice();
       const lastIndex = rounds.length - 1;
       const current = rounds[lastIndex];
+      // Votes already counted for this round (e.g. a double dispatch): ignore, or scores double.
+      if (current.results.some(r => r.finalScore != null)) return state;
       rounds[lastIndex] = { ...current, results: action.payload.resultsWithVotes };
 
       // Update total scores
@@ -122,6 +133,8 @@ interface GameStateContextValue {
   startRound: () => void;
   recordResult: (result: RoundResult) => void;
   addPlayer: (name: string) => void;
+  removePlayer: (id: string) => void;
+  resetGame: () => void;
   nextTurn: () => void;
   setCalibrationMatrix: (matrix: CalibrationMatrix) => void;
   recordVotes: (resultsWithVotes: RoundResult[]) => void;
@@ -135,7 +148,9 @@ export function GameStateProvider({ children }: { children: ReactNode }) {
   const startGame = useCallback((settings: GameSettings) => dispatch({ type: 'START_GAME', payload: settings }), []);
   const startRound = useCallback(() => dispatch({ type: 'START_ROUND' }), []);
   const recordResult = useCallback((result: RoundResult) => dispatch({ type: 'RECORD_RESULT', payload: result }), []);
-  const addPlayer = useCallback((name: string) => dispatch({ type: 'ADD_PLAYER', payload: { name } }), []);
+  const addPlayer = useCallback((name: string) => dispatch({ type: 'ADD_PLAYER', payload: { id: crypto.randomUUID(), name } }), []);
+  const removePlayer = useCallback((id: string) => dispatch({ type: 'REMOVE_PLAYER', payload: { id } }), []);
+  const resetGame = useCallback(() => dispatch({ type: 'RESET_GAME' }), []);
   const nextTurn = useCallback(() => dispatch({ type: 'NEXT_TURN' }), []);
   const setCalibrationMatrix = useCallback((matrix: CalibrationMatrix) => dispatch({ type: 'SET_CALIBRATION_MATRIX', payload: matrix }), []);
   const recordVotes = useCallback((resultsWithVotes: RoundResult[]) => dispatch({ type: 'RECORD_VOTES', payload: { resultsWithVotes } }), []);
@@ -148,11 +163,13 @@ export function GameStateProvider({ children }: { children: ReactNode }) {
       startRound,
       recordResult,
       addPlayer,
+      removePlayer,
+      resetGame,
       nextTurn,
       setCalibrationMatrix,
       recordVotes,
     }),
-    [state, startGame, startRound, recordResult, addPlayer, nextTurn, setCalibrationMatrix, recordVotes]
+    [state, startGame, startRound, recordResult, addPlayer, removePlayer, resetGame, nextTurn, setCalibrationMatrix, recordVotes]
   );
 
   return <GameStateContext.Provider value={value}>{children}</GameStateContext.Provider>;

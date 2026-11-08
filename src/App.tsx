@@ -7,11 +7,12 @@ import { VotingScreen } from './screens/VotingScreen';
 import { LeaderboardScreen } from './screens/LeaderboardScreen';
 import { GameStateProvider, useGameState } from './state/GameStateContext';
 import type { GameSettings } from './types/game';
+import { finalizeResults } from './utils/voting';
 
 type ScreenId = 'lobby' | 'calibration' | 'capture' | 'results' | 'voting' | 'leaderboard' | 'final';
 
 function AppShell() {
-  const { currentRound, state, startGame, startRound } = useGameState();
+  const { currentRound, state, startGame, startRound, resetGame, recordVotes } = useGameState();
   const [screen, setScreen] = useState<ScreenId>('lobby');
 
   const handleStartGame = (settings: GameSettings) => {
@@ -33,8 +34,13 @@ function AppShell() {
     if (currentRound && currentRound.currentPlayerIndex + 1 < state.players.length) {
       setScreen('capture');
     } else {
-      // Everyone has played, go to voting
-      setScreen('voting');
+      // Everyone has played. Voting needs someone besides the owner, so solo play skips it.
+      if (state.players.length < 2 && currentRound) {
+        recordVotes(finalizeResults(currentRound.results, {}));
+        setScreen('leaderboard');
+      } else {
+        setScreen('voting');
+      }
     }
   };
 
@@ -101,7 +107,7 @@ function AppShell() {
             ))}
           </div>
           <button
-            onClick={() => setScreen('lobby')}
+            onClick={() => { resetGame(); setScreen('lobby'); }}
             className="rounded-full bg-white px-8 py-3 font-bold text-black shadow-lg transition-transform active:scale-95"
           >
             Play Again

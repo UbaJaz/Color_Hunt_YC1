@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { useGameState } from '../state/GameStateContext';
 import { ColorSwatch } from '../components/ui/ColorSwatch';
-import { calculateBonusMultiplier } from '@color-science';
+import { finalizeResults, type Ballots, type Vote } from '../utils/voting';
 import type { RGB } from '../types/color';
 
 function rgbToHex({ r, g, b }: RGB): string {
@@ -9,69 +9,77 @@ function rgbToHex({ r, g, b }: RGB): string {
   return `#${toHex(r)}${toHex(g)}${toHex(b)}`.toUpperCase();
 }
 
+/**
+ * Pass-and-play voting: each player takes the phone in turn and votes on everyone
+ * else's object (never their own). Votes are tallied across all voters.
+ */
 export function VotingScreen({ onVotingComplete }: { onVotingComplete: () => void }) {
   const { state, currentRound, recordVotes } = useGameState();
-  const [votes, setVotes] = useState<Record<string, 'up' | 'down'>>({});
+  const [voterIndex, setVoterIndex] = useState(0);
+  const [ballots, setBallots] = useState<Ballots>({});
+  const [ready, setReady] = useState(false); // hand-off gate so voters don't see the previous voter's phone state
 
   if (!currentRound) return null;
+  const voter = state.players[voterIndex];
+  if (!voter) return null;
 
-  const handleVote = (playerId: string, vote: 'up' | 'down') => {
-    setVotes(prev => ({ ...prev, [playerId]: vote }));
+  const myVotes = ballots[voter.id] ?? {};
+  const targets = currentRound.results.filter(r => r.playerId !== voter.id && r.extractedRgb);
+
+  const handleVote = (ownerId: string, vote: Vote) => {
+    setBallots(prev => ({ ...prev, [voter.id]: { ...prev[voter.id], [ownerId]: vote } }));
   };
 
-  const handleSubmit = () => {
-    const resultsWithVotes = currentRound.results.map(result => {
-      // Fix 2: Default unvoted items to a neutral tally {0,0} so
-      // calculateBonusMultiplier returns 1.0x — no penalty for forgotten votes.
-      const vote = votes[result.playerId];
-      const tally = vote === 'up'
-        ? { thumbsUp: 1, thumbsDown: 0 }
-        : vote === 'down'
-          ? { thumbsUp: 0, thumbsDown: 1 }
-          : { thumbsUp: 0, thumbsDown: 0 }; // neutral — no vote cast
-      const multiplier = calculateBonusMultiplier(tally);
-      const finalScore = Math.min(100, Math.round((result.score || 0) * multiplier));
-
-      return {
-        ...result,
-        bonusVotes: tally,
-        finalScore,
-      };
-    });
-
-    recordVotes(resultsWithVotes);
+  const handleDone = () => {
+    if (voterIndex + 1 < state.players.length) {
+      setVoterIndex(voterIndex + 1);
+      setReady(false);
+      return;
+    }
+    recordVotes(finalizeResults(currentRound.results, ballots));
     onVotingComplete();
   };
 
+  if (!ready) {
+    return (
+      <div className="flex h-full w-full flex-col items-center justify-center gap-6 bg-neutral-950 p-6 text-white">
+        <p className="text-sm uppercase tracking-wide text-neutral-400">Bonus voting</p>
+        <h1 className="text-3xl font-bold">Pass the phone to {voter.name}</h1>
+        <button onClick={() => setReady(true)} className="rounded-full bg-pink-600 px-8 py-3 font-bold">
+          I'm {voter.name}
+        </button>
+      </div>
+    );
+  }
+
+  const isLast = voterIndex + 1 >= state.players.length;
+
   return (
-    <div className="flex h-full w-full flex-col items-center overflow-y-auto bg-neutral-950 p-6 text-white py-12">
-      <h1 className="text-2xl font-bold mb-2">Bonus Voting</h1>
-      <p className="text-sm text-neutral-400 mb-8 text-center max-w-sm">
-        Vote on whether each object is a "most unlikely item". Thumbs up grants a score multiplier!
+    <div className="flex h-full w-full flex-col items-center overflow-y-auto bg-neutral-950 p-6 py-12 text-white">
+      <h1 className="mb-2 text-2xl font-bold">{voter.name}, cast your votes</h1>
+      <p className="mb-8 max-w-sm text-center text-sm text-neutral-400">
+        Is each object a "most unlikely item"? Thumbs up from the group grants a score multiplier. Skipping counts as no vote.
       </p>
 
-      <div className="w-full max-w-sm flex flex-col gap-6">
-        {currentRound.results.map(result => {
-          const player = state.players.find(p => p.id === result.playerId);
-          if (!player || !result.extractedRgb) return null;
-          
-          const currentVote = votes[result.playerId];
-
+      <div className="flex w-full max-w-sm flex-col gap-6">
+        {targets.map(result => {
+          const owner = state.players.find(p => p.id === result.playerId);
+          if (!owner || !result.extractedRgb) return null;
+          const current = myVotes[result.playerId];
           return (
-            <div key={result.playerId} className="bg-white/10 p-4 rounded-2xl flex flex-col items-center gap-4">
-              <h2 className="font-semibold text-lg">{player.name}'s Object</h2>
+            <div key={result.playerId} className="flex flex-col items-center gap-4 rounded-2xl bg-white/10 p-4">
+              <h2 className="text-lg font-semibold">{owner.name}'s Object</h2>
               <ColorSwatch hex={rgbToHex(result.extractedRgb)} label="Extracted" />
-              
-              <div className="flex gap-4 mt-2">
+              <div className="mt-2 flex gap-4">
                 <button
                   onClick={() => handleVote(result.playerId, 'up')}
-                  className={`px-6 py-2 rounded-full font-bold transition-colors ${currentVote === 'up' ? 'bg-green-500 text-white' : 'bg-neutral-800 text-neutral-400'}`}
+                  className={`rounded-full px-6 py-2 font-bold transition-colors ${current === 'up' ? 'bg-green-500 text-white' : 'bg-neutral-800 text-neutral-400'}`}
                 >
                   👍 Unlikely
                 </button>
                 <button
                   onClick={() => handleVote(result.playerId, 'down')}
-                  className={`px-6 py-2 rounded-full font-bold transition-colors ${currentVote === 'down' ? 'bg-red-500 text-white' : 'bg-neutral-800 text-neutral-400'}`}
+                  className={`rounded-full px-6 py-2 font-bold transition-colors ${current === 'down' ? 'bg-red-500 text-white' : 'bg-neutral-800 text-neutral-400'}`}
                 >
                   👎 Common
                 </button>
@@ -81,11 +89,8 @@ export function VotingScreen({ onVotingComplete }: { onVotingComplete: () => voi
         })}
       </div>
 
-      <button
-        onClick={handleSubmit}
-        className="mt-8 rounded-full bg-pink-600 px-8 py-3 font-bold text-white shadow-lg"
-      >
-        Calculate Final Scores
+      <button onClick={handleDone} className="mt-8 rounded-full bg-pink-600 px-8 py-3 font-bold text-white shadow-lg">
+        {isLast ? 'Calculate Final Scores' : 'Done — pass the phone'}
       </button>
     </div>
   );

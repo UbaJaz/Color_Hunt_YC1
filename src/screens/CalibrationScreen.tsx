@@ -2,7 +2,7 @@ import { useCallback, useRef, useState } from 'react';
 import { CameraView } from '../components/camera/CameraView';
 import { CaptureButton } from '../components/camera/CaptureButton';
 import { useGameState } from '../state/GameStateContext';
-import { extractColorFromCanvas, estimateWhiteBalance } from '@color-science';
+import { extractColorFromCanvas, estimateWhiteBalance, validateCalibrationCard } from '@color-science';
 import { PhotoPreview } from '../components/camera/PhotoPreview';
 import type { CapturedPhoto } from '../types/capture';
 import type { TapSelection } from '../hooks/useTapSelection';
@@ -13,6 +13,7 @@ export function CalibrationScreen({ onCalibrationComplete }: { onCalibrationComp
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const [videoReady, setVideoReady] = useState(false);
   const [capturedPhoto, setCapturedPhoto] = useState<CapturedPhoto | null>(null);
+  const [error, setError] = useState<string | null>(null);
 
   const handleStreamReady = useCallback((video: HTMLVideoElement) => {
     videoElRef.current = video;
@@ -43,6 +44,12 @@ export function CalibrationScreen({ onCalibrationComplete }: { onCalibrationComp
       if (!canvas) return;
 
       const extraction = extractColorFromCanvas(canvas, selection.naturalPoint.x, selection.naturalPoint.y);
+      const check = validateCalibrationCard(extraction.extractedRgb);
+      if (!check.ok) {
+        setError(check.reason ?? 'Pick a plain white or grey paper.');
+        setCapturedPhoto(null);
+        return;
+      }
       const matrix = estimateWhiteBalance(extraction.extractedRgb);
       
       setCalibrationMatrix(matrix);
@@ -68,6 +75,7 @@ export function CalibrationScreen({ onCalibrationComplete }: { onCalibrationComp
           <div className="absolute inset-x-0 top-12 z-10 flex flex-col items-center text-center text-white text-shadow px-4 pointer-events-none">
              <h2 className="text-xl font-bold">Calibration</h2>
              <p className="text-sm opacity-80">Photograph a white/grey piece of paper</p>
+             {error && <p className="mt-2 rounded-lg bg-red-600/80 px-3 py-1 text-sm">{error}</p>}
           </div>
           <CameraView onStreamReady={handleStreamReady} />
           <div className="absolute inset-x-0 bottom-0 flex justify-center pb-8 pt-4">
