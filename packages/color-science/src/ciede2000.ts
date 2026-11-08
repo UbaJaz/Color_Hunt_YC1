@@ -138,6 +138,14 @@ export function deltaEToScore(deltaE: number, normalizationFactor: number = 15):
 }
 
 /**
+ * Game score (0-100) from a CIEDE2000 distance: smooth, never hits a hard 0/100 cliff,
+ * and a clearly wrong hue (dE 40+) scores single digits. 5 -> 90, 10 -> 69, 15 -> 50, 30 -> 20.
+ */
+export function deltaEToMatchScore(deltaE: number): number {
+  return Math.round(100 / (1 + Math.pow(Math.max(0, deltaE) / 15, 2)));
+}
+
+/**
  * Calculate color match score directly from two Lab colors
  */
 export function calculateColorScore(lab1: Lab, lab2: Lab, normalizationFactor: number = 15): number {

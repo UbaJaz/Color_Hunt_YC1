@@ -14,7 +14,7 @@ export { rejectOutliers } from './outlierRejection.js';
 export { rgbToLab, labToRgb } from './colorConversion.js';
 
 // CIEDE2000 color difference (browser portable)
-export { deltaE2000, deltaEToScore, calculateColorScore } from './ciede2000.js';
+export { deltaE2000, deltaEToScore, deltaEToMatchScore, calculateColorScore } from './ciede2000.js';
 
 // Browser canvas pixel extraction (browser portable)
 export { getPixelsFromImageData, getPixelsFromRegion } from './canvasPixels.js';
@@ -32,7 +32,7 @@ export { calculateConfidence } from './confidence.js';
 export type { ConfidenceResult, ConfidenceLevel, LightingDiagnostic } from './confidence.js';
 
 // White-balance calibration (browser portable)
-export { estimateWhiteBalance, applyCalibration } from './calibration.js';
+export { estimateWhiteBalance, applyCalibration, validateCalibrationCard } from './calibration.js';
 export type { CalibrationMatrix } from './calibration.js';
 
 // Bonus voting logic (browser portable)

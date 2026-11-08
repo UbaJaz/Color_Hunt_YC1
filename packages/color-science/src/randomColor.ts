@@ -1,5 +1,5 @@
 import { RGB, Lab } from './types.js';
-import { labToRgb } from './colorConversion.js';
+import { labToRgb, rgbToLab } from './colorConversion.js';
 
 export type Difficulty = 'easy' | 'medium' | 'hard';
 
@@ -44,12 +44,20 @@ export function generateRandomTargetColor(difficulty: Difficulty = 'medium'): RG
   }
 
   const L = minL + Math.random() * (maxL - minL);
-  const C = minC + Math.random() * (maxC - minC);
+  let C = minC + Math.random() * (maxC - minC);
   
   // Random hue angle (0 to 360 degrees) -> radians
   const hueRad = Math.random() * Math.PI * 2;
-  const a = C * Math.cos(hueRad);
-  const b = C * Math.sin(hueRad);
+  // High-chroma Lab points are often outside sRGB and would be silently clamped to a
+  // different colour; shrink chroma until the colour survives the round trip.
+  for (let i = 0; i < 30; i++) {
+    const rgb = labToRgb({ L, a: C * Math.cos(hueRad), b: C * Math.sin(hueRad) });
+    const back = rgbToLab(rgb);
+    if (Math.hypot(back.a - C * Math.cos(hueRad), back.b - C * Math.sin(hueRad)) < 3) return rgb;
+    C *= 0.92;
+  }
+  const a = 0;
+  const b = 0;
 
   const lab: Lab = { L, a, b };
   return labToRgb(lab);

@@ -5,9 +5,9 @@ import { loadFullImage } from './imageLoader.js';
 import { extractDominantColor, calculateSizeFactor } from './kmeans.js';
 import { rejectOutliers } from './outlierRejection.js';
 import { rgbToLab, labToRgb } from './colorConversion.js';
-import { deltaE2000, deltaEToScore } from './ciede2000.js';
+import { deltaE2000, deltaEToScore, deltaEToMatchScore } from './ciede2000.js';
 import { RGB, Lab } from './types.js';
-import { estimateWhiteBalance, applyCalibration } from './calibration.js';
+import { estimateWhiteBalance, applyCalibration, validateCalibrationCard } from './calibration.js';
 import { calculateBonusMultiplier, VoteTally } from './bonusVoting.js';
 import { calculateConfidence } from './confidence.js';
 import { getRarityTier, isSuccessfulUnlock } from './rarity.js';
@@ -410,14 +410,14 @@ function testCalibration() {
   const grayTest = correctedGray.g > neutralGray.g && correctedGray.b > neutralGray.b;
   console.log(`  ${grayTest ? 'âœ“ PASS' : 'âœ— FAIL'}: Gray correctly warmed`);
 
-  console.log('\nTest 3: Pathological case (10, 10, 10) - badly-lit calibration');
-  const darkCard = { r: 10, g: 10, b: 10 };
+  console.log('\nTest 3: Pathological case (255, 10, 10) - extreme cast hits the clamp');
+  const darkCard = { r: 255, g: 10, b: 10 };
   const darkCalibration = estimateWhiteBalance(darkCard);
   console.log(`  Estimated calibration matrix:`);
   console.log(`    rScale: ${darkCalibration.rScale.toFixed(3)}`);
   console.log(`    gScale: ${darkCalibration.gScale.toFixed(3)}`);
   console.log(`    bScale: ${darkCalibration.bScale.toFixed(3)}`);
-  const darkTest = darkCalibration.rScale === 3 && darkCalibration.gScale === 3 && darkCalibration.bScale === 3;
+  const darkTest = darkCalibration.rScale === 1 && darkCalibration.gScale === 3 && darkCalibration.bScale === 3;
   console.log(`  ${darkTest ? 'âœ“ PASS' : 'âœ— FAIL'}: Clamp correctly applied`);
 
   console.log('\nTest 4: Perfect white card (255, 255, 255)');
@@ -431,6 +431,20 @@ function testCalibration() {
                       Math.abs(perfectCalibration.gScale - 1) < 0.01 &&
                       Math.abs(perfectCalibration.bScale - 1) < 0.01;
   console.log(`  ${perfectTest ? 'âœ“ PASS' : 'âœ— FAIL'}: No correction needed`);
+
+  console.log('\nTest 5: Dim grey card (150,150,150) must not brighten the photo');
+  const dimCal = estimateWhiteBalance({ r: 150, g: 150, b: 150 });
+  const dimTest = dimCal.rScale === 1 && dimCal.gScale === 1 && dimCal.bScale === 1;
+  console.log(`  ${dimTest ? 'PASS' : 'FAIL'}: exposure preserved`);
+
+  console.log('\nTest 6: Card validation and match-score curve');
+  const cardTest = validateCalibrationCard({ r: 230, g: 225, b: 220 }).ok &&
+    !validateCalibrationCard({ r: 200, g: 40, b: 40 }).ok &&
+    !validateCalibrationCard({ r: 40, g: 40, b: 40 }).ok;
+  console.log(`  ${cardTest ? 'PASS' : 'FAIL'}: white accepted, red/dark rejected`);
+  const scoreTest = deltaEToMatchScore(0) === 100 && deltaEToMatchScore(15) === 50 && deltaEToMatchScore(60) < 10;
+  console.log(`  ${scoreTest ? 'PASS' : 'FAIL'}: match score 0->100, 15->50, 60->single digits`);
+  if (!(dimTest && cardTest && scoreTest)) process.exitCode = 1;
 
   console.log('\n' + '-'.repeat(80));
 }
