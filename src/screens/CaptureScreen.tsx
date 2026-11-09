@@ -47,6 +47,8 @@ export function CaptureScreen({ onRoundResultReady, online }: CaptureScreenProps
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const [capturedPhoto, setCapturedPhoto] = useState<CapturedPhoto | null>(null);
   const [videoReady, setVideoReady] = useState(false);
+  // Two-colour rounds share ONE deadline across both captures; the Timer remounts when the camera comes back.
+  const [pairDeadline] = useState(() => Date.now() + PAIR_TURN_SECONDS * 1000);
   const [first, setFirst] = useState<{ extraction: Extraction } | null>(null); // two-colour rounds: the warm capture, waiting for the cool one
 
   const player = useMemo(() => (online ? { id: 'me', name: online.playerName } : state.players[currentRound!.currentPlayerIndex]), [online, state.players, currentRound]);
@@ -205,7 +207,7 @@ export function CaptureScreen({ onRoundResultReady, online }: CaptureScreenProps
           <div className="absolute top-24 inset-x-0 z-10 flex justify-center">
             <div className="bg-black/50 px-4 py-2 rounded-full backdrop-blur-md flex items-center gap-4">
               <span className="text-white font-medium">{player?.name}'s Turn</span>
-              <Timer durationSeconds={currentRound.targetColor2 ? PAIR_TURN_SECONDS : TURN_SECONDS} onExpire={handleTimeExpire} />
+              <Timer durationSeconds={TURN_SECONDS} deadlineAt={currentRound.targetColor2 ? pairDeadline : undefined} onExpire={handleTimeExpire} />
             </div>
           </div>
           <CameraView onStreamReady={handleStreamReady} onUpload={handleUpload} />

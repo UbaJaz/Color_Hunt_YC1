@@ -3,14 +3,17 @@ import { beep, buzz } from '../../utils/sound';
 
 export function Timer({
   durationSeconds = 60,
+  deadlineAt,
   onExpire,
 }: {
   durationSeconds?: number;
+  /** Absolute end time (ms). Lets a countdown carry across remounts, e.g. the camera returning for a second capture. */
+  deadlineAt?: number;
   onExpire: () => void;
 }) {
   // Wall-clock deadline, so a locked phone or backgrounded tab can't pause the countdown.
-  const deadline = useRef(Date.now() + durationSeconds * 1000);
-  const [timeLeft, setTimeLeft] = useState(durationSeconds);
+  const deadline = useRef(deadlineAt ?? Date.now() + durationSeconds * 1000);
+  const [timeLeft, setTimeLeft] = useState(() => Math.max(0, Math.ceil((deadline.current - Date.now()) / 1000)));
   const expired = useRef(false);
 
   useEffect(() => {
