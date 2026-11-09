@@ -138,3 +138,7 @@ The full test and verification log is in [docs/VERIFICATION.md](docs/VERIFICATIO
 ## License
 
 MIT, see [LICENSE](LICENSE).
+
+## Online multiplayer
+
+Create or join a room from the lobby ("Play online with friends"). Rooms use Supabase Realtime broadcast (no tables); the host device is authoritative and recomputes scores. Copy `.env.example` to `.env` and fill in `VITE_SUPABASE_URL` and `VITE_SUPABASE_ANON_KEY`.

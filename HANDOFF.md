@@ -17,7 +17,7 @@ Add real online multiplayer (each player on their own phone) to the pass-and-pla
 - Config: `.env` `VITE_SUPABASE_URL`, `VITE_SUPABASE_ANON_KEY`; add `.env.example`, git-ignore `.env`. Get URL/key from the Supabase connector (`list_projects`, `get_project_url`, `get_publishable_keys`); ask the user which project if more than one.
 - Add unit tests for the host reducer/intents and score recompute.
 
-## Next steps
+## Next steps (superseded: online multiplayer is done, see git log)
 1. `npm i @supabase/supabase-js`; create `src/net/room.ts` and env wiring.
 2. Export reducer, add online intents + host-side score recompute (+ tests).
 3. Lobby Create/Join UI, online round/voting flow, reconnect on refresh.
