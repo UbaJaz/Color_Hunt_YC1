@@ -4,7 +4,7 @@
 Pass-and-play and online (Supabase Realtime, host-authoritative, no tables) both work. Pushed to https://github.com/UbaJaz/Color_Hunt_YC1 (main). Build, lint and vitest are green. `npm test` also rebuilds `packages/color-science`.
 
 ## Features
-Scoring: colour match + votes + spot-on + streak bonuses. Options: colour packs, theme prompts, two-colour rounds, memory mode, seeded challenge links, daily challenge (+ streak, local stats), reveal screen, colour-blind aid, sound/vibration prefs, share-results image, PWA, spectators, rejoin after closing the tab, emoji reactions, host-gone banner, signed intents.
+Scoring: colour match + votes + spot-on + streak bonuses. Options: colour packs, theme prompts, two-colour rounds, memory mode, seeded challenge links, daily challenge (+ streak, local stats), reveal screen, colour-blind aid, sound/vibration prefs, share-results image, PWA, spectators, rejoin after closing the tab, emoji reactions, host migration, online stats, photo shown when voting (pass-and-play only), signed intents.
 
 ## Not verified (needs real phones)
 Camera, white-balance lock, share sheet, photo-upload fallback, PWA install, vibration, a full online round with 2+ real players.
@@ -12,7 +12,7 @@ Camera, white-balance lock, share sheet, photo-upload fallback, PWA install, vib
 ## Next steps
 1. Set `VITE_SUPABASE_URL` and `VITE_SUPABASE_ANON_KEY` in the Vercel project env vars and redeploy.
 2. Test on two real phones (list above).
-3. Host migration (the biggest online weakness); Edge Function room tokens if the game gets public traffic.
+3. Edge Function room tokens if the game gets public traffic (host migration is done: see `src/net/auth.ts` acceptState and `useRoom`).
 4. Speed round was skipped on purpose: the host cannot trust client-reported times.
 
 ## Notes

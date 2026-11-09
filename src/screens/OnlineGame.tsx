@@ -4,8 +4,8 @@ import { useGameState } from '../state/GameStateContext';
 import { CaptureScreen } from './CaptureScreen';
 import { CalibrationScreen } from './CalibrationScreen';
 import { ColorSwatch } from '../components/ui/ColorSwatch';
-import { newIdentity, signIntent, signState, verifyIntent, verifyState, type AuthRegistry, type Identity } from '../net/auth';
-import { createRoom, hostReduce, REACTIONS, type Intent, type OnlineState } from '../net/host';
+import { acceptState, newIdentity, signIntent, signState, verifyIntent, type AuthRegistry, type Identity } from '../net/auth';
+import { createRoom, hostReduce, promoteHost, REACTIONS, successors, type Intent, type OnlineState } from '../net/host';
 import { makeRoomCode, onlineConfigured, openRoom, type RoomConn } from '../net/room';
 import type { RGB } from '../types/color';
 import { PACKS, type GameSettings } from '../types/game';
@@ -34,6 +34,7 @@ const RECORDED_KEY = 'colorhunt.online.recorded';
 export const MAX_RETAKES = 3;
 const HEARTBEAT_MS = 5000;
 const HOST_TIMEOUT_MS = 15000;
+const TAKEOVER_STAGGER_MS = 6000; // each later successor waits this much longer, so they do not all take over at once
 export const loadOnlineSession = (): Session | null => {
   try {
     const s = JSON.parse(sessionStorage.getItem(KEY) ?? 'null');
@@ -81,6 +82,8 @@ function useRoom(session: Session, onSession: (s: Session) => void) {
   const sess = useRef(session); // latest session, so async callbacks never write back stale auth data
   const queue = useRef<Promise<unknown>>(Promise.resolve()); // keeps verify/sign work in message order
   const seq = useRef(0);
+  // Clients watch the (signed) intents everyone sends, so a successor knows each player's latest seq and can refuse replays.
+  const observed = useRef<AuthRegistry>({ keys: {}, seqs: {} });
 
   const persist = useCallback((patch: Partial<Session>) => {
     sess.current = { ...sess.current, ...patch };
@@ -94,9 +97,13 @@ function useRoom(session: Session, onSession: (s: Session) => void) {
   const broadcast = useCallback((s: OnlineState) => enqueue(async () => conn.current?.sendState(await signState(sess.current.identity, s))), [enqueue]);
 
   const apply = useCallback(
-    (from: string, intent: Intent) => {
+    (from: string, intent: Intent, pub?: JsonWebKey) => {
       if (!stateRef.current) return;
-      const next = hostReduce(stateRef.current, from, intent);
+      let next = hostReduce(stateRef.current, from, intent);
+      // Remember every member's public key in the state, so another player can take over if this host disappears.
+      if (pub && !next.keys?.[from] && (next.players.some(p => p.id === from) || next.spectators?.some(w => w.id === from))) {
+        next = { ...next, keys: { ...next.keys, [from]: pub } };
+      }
       stateRef.current = next;
       setState(next);
       persist({ host: next });
@@ -104,6 +111,22 @@ function useRoom(session: Session, onSession: (s: Session) => void) {
     },
     [persist, broadcast]
   );
+
+  /** This client becomes the host of the game it last saw. Scores, phase and ballots carry over unchanged. */
+  const promote = useCallback(() => {
+    const cur = stateRef.current;
+    if (!cur || !cur.keys?.[sess.current.playerId]) return;
+    const next = promoteHost(cur, sess.current.playerId);
+    const now = Date.now();
+    const seqs: Record<string, number> = {};
+    for (const id of Object.keys(next.keys ?? {})) seqs[id] = observed.current.seqs[id] ?? -1; // never lower than what we saw
+    stateRef.current = next;
+    lastSeen.current = now;
+    setState(next);
+    setHostGone(false);
+    persist({ isHost: true, host: next, hostPub: undefined, auth: { keys: { ...next.keys }, seqs } });
+    broadcast(next);
+  }, [persist, broadcast]);
 
   const sendIntent = useCallback(
     (intent: Intent) => enqueue(async () => {
@@ -115,20 +138,31 @@ function useRoom(session: Session, onSession: (s: Session) => void) {
 
   useEffect(() => {
     const c = openRoom(session.code, {
-      onIntent: env => {
-        if (!session.isHost) return;
+      onIntent: env =>
         enqueue(async () => {
+          if (!sess.current.isHost) {
+            // Not the host: only track signed seqs (against keys from the state) for a possible takeover.
+            observed.current.keys = { ...stateRef.current?.keys, ...observed.current.keys };
+            await verifyIntent(observed.current, env);
+            return;
+          }
           const reg = sess.current.auth ?? { keys: {}, seqs: {} };
           const from = await verifyIntent(reg, env);
           if (!from) return;
           persist({ auth: reg });
-          apply(from, env.intent);
-        });
-      },
+          apply(from, env.intent, env.pub);
+        }),
       onState: msg =>
         enqueue(async () => {
-          if (session.isHost || !(await verifyState(msg, sess.current.hostPub ?? null))) return;
-          if (!sess.current.hostPub) persist({ hostPub: msg.pub });
+          const cur = stateRef.current;
+          const iAmHost = sess.current.isHost;
+          const verdict = await acceptState(msg, cur, iAmHost ? sess.current.identity.pub : (sess.current.hostPub ?? null));
+          if (!verdict) return;
+          if (iAmHost && verdict !== 'migrated') return; // our own echo
+          if (verdict === 'migrated') {
+            // Another player took over (or the old host's seat was filled while we were away): follow them.
+            persist({ isHost: false, host: null, hostPub: msg.pub, auth: undefined });
+          } else if (!sess.current.hostPub) persist({ hostPub: msg.pub });
           lastSeen.current = Date.now();
           setHostGone(false);
           stateRef.current = msg.state;
@@ -138,11 +172,19 @@ function useRoom(session: Session, onSession: (s: Session) => void) {
     conn.current = c;
     let timer: ReturnType<typeof setInterval> | undefined;
     let tries = 0;
-    // Heartbeat: the host rebroadcasts every 5s; clients that hear nothing for 15s show a banner.
+    // Heartbeat: the host rebroadcasts every 5s. Clients that hear nothing for 15s show a banner and the first
+    // successor (then the next, a few seconds apart) takes over.
     const beat = setInterval(() => {
-      if (session.isHost) {
-        if (stateRef.current) broadcast(stateRef.current);
-      } else if (stateRef.current && Date.now() - lastSeen.current > HOST_TIMEOUT_MS) setHostGone(true);
+      const cur = stateRef.current;
+      if (sess.current.isHost) {
+        if (cur) broadcast(cur);
+        return;
+      }
+      if (!cur) return;
+      const idle = Date.now() - lastSeen.current;
+      if (idle > HOST_TIMEOUT_MS) setHostGone(true);
+      const rank = successors(cur).indexOf(sess.current.playerId);
+      if (rank >= 0 && idle > HOST_TIMEOUT_MS + rank * TAKEOVER_STAGGER_MS) promote();
     }, HEARTBEAT_MS);
     if (!session.isHost) {
       const hello = () => {
@@ -212,13 +254,30 @@ function ReactionBar({ state, send }: { state: OnlineState; send: (i: Intent) =>
 
 function Room({ session, onSession, onLeave }: { session: Session; onSession: (s: Session) => void; onLeave: () => void }) {
   const room = useRoom(session, onSession);
+  const [notice, setNotice] = useState('');
+  const prevHost = useRef(room.state?.hostId);
+  // Tell everyone when the host changes hands.
+  useEffect(() => {
+    const hostId = room.state?.hostId;
+    if (hostId && prevHost.current && hostId !== prevHost.current) {
+      const name = room.state?.players.find(p => p.id === hostId)?.name ?? 'Someone';
+      setNotice(hostId === session.playerId ? 'You are now the host.' : `${name} is now the host.`);
+      const t = setTimeout(() => setNotice(''), 8000);
+      prevHost.current = hostId;
+      return () => clearTimeout(t);
+    }
+    prevHost.current = hostId;
+  }, [room.state?.hostId, room.state?.players, session.playerId]);
   return (
     <div className="relative h-full w-full">
       {room.hostGone && (
         <div role="alert" className="absolute inset-x-0 top-0 z-50 bg-red-600 p-2 text-center text-sm font-semibold text-white">
-          Host disconnected. Waiting for them to come back…{' '}
+          Host disconnected. The next player takes over automatically…{' '}
           <button onClick={onLeave} className="underline">Leave</button>
         </div>
+      )}
+      {notice && !room.hostGone && (
+        <div role="status" className="absolute inset-x-0 top-0 z-50 bg-emerald-600 p-2 text-center text-sm font-semibold text-white">{notice}</div>
       )}
       <RoomView session={session} onLeave={onLeave} room={room} />
       {room.state && ['voting', 'leaderboard', 'final'].includes(room.state.phase) && (room.state.players.some(p => p.id === session.playerId) || room.state.spectators?.some(w => w.id === session.playerId)) && <ReactionBar state={room.state} send={room.send} />}
@@ -499,7 +558,8 @@ export function OnlineGame({ onExit }: { onExit: () => void }) {
   const create = async () => {
     const playerId = crypto.randomUUID();
     const room = makeRoomCode();
-    update({ code: room, playerId, name: trimmed, isHost: true, host: createRoom(room, playerId, trimmed), identity: await newIdentity() });
+    const identity = await newIdentity();
+    update({ code: room, playerId, name: trimmed, isHost: true, host: createRoom(room, playerId, trimmed, identity.pub), identity });
   };
   const join = async () => update({ code: code.trim().toUpperCase(), playerId: crypto.randomUUID(), name: trimmed, isHost: false, host: null, identity: await newIdentity() });
 
