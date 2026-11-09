@@ -120,7 +120,7 @@ export function ResultsScreen({ onContinue, onRetake, retakesLeft }: ResultsScre
           <div className="text-center">
             <p className="text-xs uppercase tracking-wide text-neutral-400">{result.score != null ? scoreLabel(result.score) : 'Score'}</p>
             <p className="text-xl font-semibold text-pink-400">
-              {result.score != null ? `${Math.round(result.score)}%` : '—'}
+              {result.score != null ? `${Math.round(result.score)}` : '—'}<span className="text-xs text-neutral-400"> / 100</span>
             </p>
           </div>
           <div className="text-center">

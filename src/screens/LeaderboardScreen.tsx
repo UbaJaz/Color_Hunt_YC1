@@ -44,7 +44,7 @@ export function LeaderboardScreen({ onNextRound }: { onNextRound: () => void }) 
                   <div className="flex flex-col items-end">
                     <span className="font-bold text-lg text-pink-400">{result.finalScore}</span>
                     {result.bonusVotes && (result.bonusVotes.thumbsUp > result.bonusVotes.thumbsDown) && (
-                      <span className="text-[10px] text-green-400 font-bold uppercase tracking-wide">Bonus!</span>
+                      <span className="text-[10px] text-green-400 font-bold uppercase tracking-wide">Vote bonus +{(result.finalScore ?? 0) - Math.round(result.score ?? 0)}</span>
                     )}
                   </div>
                 </div>

@@ -4,6 +4,7 @@ let ctx: AudioContext | null = null;
 export function beep(freq = 880, ms = 120, volume = 0.08) {
   try {
     ctx ??= new AudioContext();
+    if (ctx.state === 'suspended') void ctx.resume();
     const osc = ctx.createOscillator();
     const gain = ctx.createGain();
     osc.frequency.value = freq;

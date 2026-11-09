@@ -12,7 +12,7 @@ import { clearSave, loadSave, writeSave } from './utils/save';
 
 const MAX_RETAKES = 3;
 
-type ScreenId = 'lobby' | 'calibration' | 'capture' | 'results' | 'voting' | 'leaderboard' | 'final';
+type ScreenId = 'lobby' | 'howto' | 'calibration' | 'capture' | 'results' | 'voting' | 'leaderboard' | 'final';
 
 function AppShell() {
   const { currentRound, state, startGame, startRound, resetGame, recordVotes, loadState } = useGameState();
@@ -23,7 +23,7 @@ function AppShell() {
 
   useEffect(() => {
     if (screen === 'final') clearSave();
-    else if (screen !== 'lobby') writeSave({ state, screen, retakesUsed });
+    else if (screen !== 'lobby' && screen !== 'howto') writeSave({ state, screen, retakesUsed });
   }, [state, screen, retakesUsed]);
 
   const handleResume = () => {
@@ -41,12 +41,12 @@ function AppShell() {
 
   const handleStartGame = (settings: GameSettings) => {
     startGame(settings);
+    setScreen('howto');
+  };
+
+  const handleHowToDone = () => {
     // If not calibrated, go to calibration. Else go straight to capture.
-    if (!state.calibrationMatrix) {
-      setScreen('calibration');
-    } else {
-      setScreen('capture');
-    }
+    setScreen(state.calibrationMatrix ? 'capture' : 'calibration');
   };
 
   const handleCalibrationComplete = () => {
@@ -113,6 +113,18 @@ function AppShell() {
         </div>
       )}
       {screen === 'lobby' && !saved && <LobbyScreen onStartGame={handleStartGame} />}
+      {screen === 'howto' && (
+        <div className="flex h-full w-full flex-col items-center justify-center gap-6 bg-neutral-950 p-6 text-center text-white">
+          <h1 className="text-3xl font-bold">How to play</h1>
+          <ol className="max-w-xs list-decimal space-y-3 pl-5 text-left text-neutral-200">
+            <li>You get a target colour and 45 seconds.</li>
+            <li>Find a real object that matches it and take a photo.</li>
+            <li>Tap the object, then confirm. Closer colour, higher score.</li>
+            <li>Everyone votes on each other's finds for up to 15 bonus points.</li>
+          </ol>
+          <button onClick={handleHowToDone} className="rounded-full bg-pink-600 px-8 py-3 font-bold">Got it</button>
+        </div>
+      )}
       {screen === 'calibration' && <CalibrationScreen onCalibrationComplete={handleCalibrationComplete} />}
       {screen === 'capture' && (
         <CaptureScreen key={`${currentRound?.roundNumber}-${currentRound?.currentPlayerIndex}-${retakesUsed}`} onRoundResultReady={() => setScreen('results')} />

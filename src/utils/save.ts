@@ -2,6 +2,9 @@ import type { GameState } from '../types/game';
 
 const KEY = 'colorhunt-save-v1';
 
+// Screens that can be resumed safely (lobby/final have nothing to resume, howto is transient).
+const RESUMABLE = ['calibration', 'capture', 'results', 'voting', 'leaderboard'];
+
 export interface SavedGame {
   state: GameState;
   screen: string;
@@ -18,7 +21,8 @@ export function loadSave(): SavedGame | null {
       Array.isArray(saved?.state?.players) &&
       Array.isArray(saved.state.rounds) &&
       saved.state.rounds.length > 0 &&
-      typeof saved.screen === 'string';
+      saved.state.settings != null &&
+      RESUMABLE.includes(saved.screen);
     return ok ? saved : null;
   } catch {
     return null;
