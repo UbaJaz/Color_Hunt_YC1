@@ -60,6 +60,21 @@ describe('host reducer', () => {
     expect(full.spectators).toHaveLength(2); // host + 7 players fill the room
   });
 
+  it('scores two-colour rounds as the average of both captures and ignores a spoofed second colour', () => {
+    const WARM = { id: 'w', name: 'Warm', hex: '#ff0000', rgb: { r: 255, g: 0, b: 0 }, difficulty: 'easy' } as const;
+    const COOL = { id: 'c', name: 'Cool', hex: '#0000ff', rgb: { r: 0, g: 0, b: 255 }, difficulty: 'easy' } as const;
+    const two: PickTarget = (_s, _e, _n, slot) => (slot === 2 ? COOL : WARM);
+    let s = hostReduce(lobby(), 'h', { type: 'START', settings: { ...SETTINGS, twoColor: true } }, two);
+    expect(s.rounds[0].targetColor2?.id).toBe('c');
+    s = hostReduce(s, 'a', { type: 'SUBMIT', extractedRgb: WARM.rgb, extractedRgb2: COOL.rgb }, two);
+    const r = s.rounds[0].results[0];
+    expect(r.pair).toHaveLength(2);
+    expect(r.score).toBeGreaterThanOrEqual(99);
+    s = hostReduce(s, 'b', { type: 'SUBMIT', extractedRgb: WARM.rgb, extractedRgb2: { r: 999, g: 0, b: 0 } }, two);
+    expect(s.rounds[0].results[1].pair![1].extractedRgb).toBeNull(); // invalid second colour counts as missing
+    expect(s.rounds[0].results[1].score).toBeLessThan(60);
+  });
+
   it('only the host can start', () => {
     expect(run(lobby(), ['a', { type: 'START', settings: { ...SETTINGS } }]).phase).toBe('lobby');
     expect(playing().phase).toBe('playing');

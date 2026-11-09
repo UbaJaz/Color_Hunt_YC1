@@ -1,6 +1,7 @@
 import type { RGB, TargetColor, Difficulty } from '../types/color';
 import { generateRandomTargetColor } from '@color-science';
-import type { Pack } from '../types/game';
+import type { GameSettings, Pack } from '../types/game';
+import { seededRng } from '../utils/challenge';
 
 function hexToRgb(hex: string): RGB {
   const normalized = hex.replace('#', '');
@@ -97,3 +98,26 @@ export function getDynamicTargetColor(difficulty: Difficulty = 'medium', rng: ()
   };
 }
 
+
+/** Rough warm/cool split on hue: reds, oranges and yellows are warm, everything else cool. Greys count as warm. */
+export function isWarm({ r, g, b }: RGB): boolean {
+  const max = Math.max(r, g, b);
+  const d = max - Math.min(r, g, b);
+  if (d === 0) return true;
+  const sector = max === r ? ((g - b) / d) % 6 : max === g ? (b - r) / d + 2 : (r - g) / d + 4;
+  const hue = (sector * 60 + 360) % 360;
+  return hue <= 75 || hue >= 330;
+}
+
+/**
+ * The target for a round. Two-colour rounds ask for slot 1 (warm) and slot 2 (cool); a seed keeps both reproducible.
+ * Single-colour rounds seed exactly as before so existing challenge links give the same colours.
+ */
+export function pickTargetColor(settings: GameSettings | null, excludeId?: string, roundNumber = 1, slot: 1 | 2 = 1): TargetColor {
+  const pair = !!settings?.twoColor;
+  const rng = settings?.seed ? seededRng(settings.seed, pair ? roundNumber * 10 + slot : roundNumber) : undefined;
+  const draw = () => (settings?.useRandomColor ? getDynamicTargetColor(settings.difficulty, rng) : getRandomTargetColor(excludeId, rng, settings?.pack));
+  let color = draw();
+  if (pair) for (let i = 0; i < 40 && isWarm(color.rgb) !== (slot === 1); i++) color = draw();
+  return color;
+}

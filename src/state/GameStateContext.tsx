@@ -1,6 +1,6 @@
 import { createContext, useCallback, useContext, useMemo, useReducer, type ReactNode } from 'react';
 import type { GameState, GameSettings, Player, Round, RoundResult } from '../types/game';
-import { getRandomTargetColor, getDynamicTargetColor } from '../data/targetColors';
+import { pickTargetColor } from '../data/targetColors';
 import type { CalibrationMatrix } from '@color-science';
 import { seededRng } from '../utils/challenge';
 import { pickTheme } from '../data/themes';
@@ -17,27 +17,15 @@ type Action =
   | { type: 'SET_CALIBRATION_MATRIX'; payload: CalibrationMatrix }
   | { type: 'RECORD_VOTES'; payload: { resultsWithVotes: RoundResult[] } };
 
-/**
- * Pick a target color for a new round.
- * If settings.useRandomColor is true, use the procedural Lab-space generator
- * (getDynamicTargetColor) with the configured difficulty.
- * Otherwise fall back to the curated preset list, excluding the previous round's colour.
- */
-function pickTargetColor(settings: GameSettings | null, excludeColorId?: string, roundNumber = 1) {
-  const rng = settings?.seed ? seededRng(settings.seed, roundNumber) : undefined;
-  if (settings?.useRandomColor) {
-    return getDynamicTargetColor(settings.difficulty, rng);
-  }
-  return getRandomTargetColor(excludeColorId, rng, settings?.pack);
-}
-
 function createRound(roundNumber: number, settings: GameSettings | null, excludeColorId?: string): Round {
+  const targetColor = pickTargetColor(settings, excludeColorId, roundNumber, 1);
   return {
     roundNumber,
-    targetColor: pickTargetColor(settings, excludeColorId, roundNumber),
+    targetColor,
     results: [],
     currentPlayerIndex: 0,
     ...(settings?.themes && { theme: pickTheme(settings.seed ? seededRng(settings.seed, roundNumber + 1000) : undefined) }),
+    ...(settings?.twoColor && { targetColor2: pickTargetColor(settings, targetColor.id, roundNumber, 2) }),
   };
 }
 

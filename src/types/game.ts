@@ -41,6 +41,8 @@ export interface GameSettings {
   themes?: boolean;
   /** Which curated colour list the preset rounds draw from (ignored in random-colour mode). */
   pack?: Pack;
+  /** Every round asks for two objects: a warm colour and a cool one. */
+  twoColor?: boolean;
 }
 
 /**
@@ -51,6 +53,13 @@ export interface GameSettings {
  * in Lab space) and `deltaE2000`/`deltaEToScore` (see CaptureScreen). They
  * stay `null` only until a result has actually been recorded for the round.
  */
+/** One capture of a two-colour round, scored on its own. */
+export interface PairPart {
+  extractedRgb: RGB | null;
+  deltaE: number | null;
+  score: number;
+}
+
 export interface RoundResult {
   playerId: string;
   region: Region | null;
@@ -62,6 +71,8 @@ export interface RoundResult {
   finalScore: number | null;
   /** Consecutive rounds (this one included) with a colour score of at least 80. */
   streak?: number;
+  /** Two-colour rounds: both captures. The main extractedRgb/deltaE/score fields hold the first colour and the average. */
+  pair?: PairPart[];
   debugData?: ExtractionDebugData | null;
 }
 
@@ -71,6 +82,8 @@ export interface Round {
   results: RoundResult[];
   currentPlayerIndex: number;
   theme?: string;
+  /** Two-colour rounds: the cool colour; targetColor is the warm one. */
+  targetColor2?: TargetColor;
 }
 
 export interface GameState {

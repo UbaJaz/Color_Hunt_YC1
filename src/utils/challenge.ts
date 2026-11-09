@@ -32,6 +32,7 @@ export function parseChallenge(search: string): GameSettings | null {
     useRandomColor: q.get('random') === '1',
     memoryMode: q.get('memory') === '1',
     themes: q.get('themes') === '1',
+    twoColor: q.get('two') === '1',
     pack: PACKS.includes(q.get('pack') as Pack) ? (q.get('pack') as Pack) : 'all',
   };
 }
@@ -41,6 +42,7 @@ export function buildChallengeUrl(base: string, s: GameSettings & { seed: string
   if (s.useRandomColor) q.set('random', '1');
   if (s.memoryMode) q.set('memory', '1');
   if (s.themes) q.set('themes', '1');
+  if (s.twoColor) q.set('two', '1');
   if (s.pack && s.pack !== 'all') q.set('pack', s.pack);
   return `${base}?${q}`;
 }

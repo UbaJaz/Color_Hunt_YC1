@@ -1,8 +1,8 @@
-import { deltaE2000, deltaEToMatchScore, rgbToLab } from '@color-science';
 import type { RGB } from '../types/color';
 import { PACKS, type GameSettings, type Pack, type Player, type Round, type RoundResult } from '../types/game';
-import { getDynamicTargetColor, getRandomTargetColor } from '../data/targetColors';
+import { pickTargetColor } from '../data/targetColors';
 import { seededRng } from '../utils/challenge';
+import { combineParts, scorePart } from '../utils/pair';
 import { pickTheme } from '../data/themes';
 import { finalizeResults, type Ballots, type Vote } from '../utils/voting';
 
@@ -36,7 +36,7 @@ export interface OnlineState {
 export type Intent =
   | { type: 'JOIN'; name: string }
   | { type: 'START'; settings: GameSettings }
-  | { type: 'SUBMIT'; extractedRgb: RGB | null }
+  | { type: 'SUBMIT'; extractedRgb: RGB | null; extractedRgb2?: RGB | null }
   | { type: 'VOTES'; votes: Record<string, Vote> }
   | { type: 'FORCE' }
   | { type: 'NEXT' }
@@ -60,11 +60,8 @@ export function createRoom(code: string, hostId: string, hostName: string): Onli
   };
 }
 
-export type PickTarget = (settings: GameSettings, excludeId: string | undefined, roundNumber: number) => Round['targetColor'];
-const defaultPick: PickTarget = (s, ex, n) => {
-  const rng = s.seed ? seededRng(s.seed, n) : undefined;
-  return s.useRandomColor ? getDynamicTargetColor(s.difficulty, rng) : getRandomTargetColor(ex, rng, s.pack);
-};
+export type PickTarget = (settings: GameSettings, excludeId: string | undefined, roundNumber: number, slot?: 1 | 2) => Round['targetColor'];
+const defaultPick: PickTarget = pickTargetColor;
 
 const validByte = (n: unknown) => typeof n === 'number' && Number.isFinite(n) && n >= 0 && n <= 255;
 const validRgb = (c: RGB | null): c is RGB => !!c && validByte(c.r) && validByte(c.g) && validByte(c.b);
@@ -74,14 +71,16 @@ function newRound(state: OnlineState, pick: PickTarget): Round {
   const roundNumber = state.rounds.length + 1;
   const settings = state.settings!;
   const theme = settings.themes ? pickTheme(settings.seed ? seededRng(settings.seed, roundNumber + 1000) : undefined) : undefined;
-  return { roundNumber, targetColor: pick(settings, prev?.targetColor.id, roundNumber), results: [], currentPlayerIndex: 0, ...(theme && { theme }) };
+  const targetColor = pick(settings, prev?.targetColor.id, roundNumber, 1);
+  const targetColor2 = settings.twoColor ? pick(settings, targetColor.id, roundNumber, 2) : undefined;
+  return { roundNumber, targetColor, results: [], currentPlayerIndex: 0, ...(theme && { theme }), ...(targetColor2 && { targetColor2 }) };
 }
 
-function scoreResult(playerId: string, rgb: RGB | null, target: RGB): RoundResult {
+function scoreResult(playerId: string, rgb: RGB | null, round: Round, rgb2?: RGB | null): RoundResult {
   const base = { playerId, region: null, confidence: null, bonusVotes: null, finalScore: null };
-  if (!rgb) return { ...base, extractedRgb: null, deltaE: null, score: 0 };
-  const deltaE = deltaE2000(rgbToLab(rgb), rgbToLab(target));
-  return { ...base, extractedRgb: rgb, deltaE, score: deltaEToMatchScore(deltaE) };
+  const first = scorePart(rgb, round.targetColor.rgb);
+  if (!round.targetColor2) return { ...base, ...first };
+  return { ...base, ...combineParts([first, scorePart(rgb2 ?? null, round.targetColor2.rgb)]) };
 }
 
 /** Totals are always rebuilt from the per-round final scores, so a replayed or duplicated message can't double count. */
@@ -126,7 +125,7 @@ export function hostReduce(state: OnlineState, from: string, intent: Intent, pic
     case 'START': {
       if (!isHost || state.phase !== 'lobby') return state;
       const s = intent.settings;
-      const settings: GameSettings = { roundCount: Math.min(Math.max(Math.floor(s.roundCount) || 3, 1), 10), difficulty: s.difficulty, useRandomColor: !!s.useRandomColor, memoryMode: !!s.memoryMode, themes: !!s.themes, pack: PACKS.includes(s.pack as Pack) ? s.pack : 'all', seed: typeof s.seed === "string" && /^[a-z0-9]{1,12}$/i.test(s.seed) ? s.seed : undefined };
+      const settings: GameSettings = { roundCount: Math.min(Math.max(Math.floor(s.roundCount) || 3, 1), 10), difficulty: s.difficulty, useRandomColor: !!s.useRandomColor, memoryMode: !!s.memoryMode, themes: !!s.themes, twoColor: !!s.twoColor, pack: PACKS.includes(s.pack as Pack) ? s.pack : 'all', seed: typeof s.seed === "string" && /^[a-z0-9]{1,12}$/i.test(s.seed) ? s.seed : undefined };
       const next = { ...state, settings, rounds: [] as Round[], ballots: {}, reactions: [], phase: 'playing' as Phase };
       return { ...next, rounds: [newRound(next, pick)] };
     }
@@ -134,7 +133,7 @@ export function hostReduce(state: OnlineState, from: string, intent: Intent, pic
       if (state.phase !== 'playing' || !isPlayer || last.results.some(r => r.playerId === from)) return state;
       const rgb = validRgb(intent.extractedRgb) ? intent.extractedRgb : null;
       const rounds = state.rounds.slice();
-      rounds[rounds.length - 1] = { ...last, results: [...last.results, scoreResult(from, rgb, last.targetColor.rgb)] };
+      rounds[rounds.length - 1] = { ...last, results: [...last.results, scoreResult(from, rgb, last, validRgb(intent.extractedRgb2 ?? null) ? intent.extractedRgb2 : null)] };
       return afterAllSubmitted({ ...state, rounds });
     }
     case 'VOTES': {
@@ -153,7 +152,7 @@ export function hostReduce(state: OnlineState, from: string, intent: Intent, pic
       if (state.phase === 'playing') {
         const missing = state.players.filter(p => !last.results.some(r => r.playerId === p.id));
         const rounds = state.rounds.slice();
-        rounds[rounds.length - 1] = { ...last, results: [...last.results, ...missing.map(p => scoreResult(p.id, null, last.targetColor.rgb))] };
+        rounds[rounds.length - 1] = { ...last, results: [...last.results, ...missing.map(p => scoreResult(p.id, null, last))] };
         return afterAllSubmitted({ ...state, rounds });
       }
       return state.phase === 'voting' ? finishVoting(state) : state;
