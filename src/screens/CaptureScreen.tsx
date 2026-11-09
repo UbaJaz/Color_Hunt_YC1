@@ -61,6 +61,25 @@ export function CaptureScreen({ onRoundResultReady, online }: CaptureScreenProps
     });
   }, [videoReady]);
 
+  /** Camera denied: load a picked photo into the same canvas the camera path uses. */
+  const handleUpload = useCallback((file: File) => {
+    const canvas = canvasRef.current;
+    const ctx = canvas?.getContext('2d');
+    if (!canvas || !ctx) return;
+    const url = URL.createObjectURL(file);
+    const img = new Image();
+    img.onload = () => {
+      const scale = Math.min(1, 1600 / Math.max(img.naturalWidth, img.naturalHeight));
+      canvas.width = Math.round(img.naturalWidth * scale);
+      canvas.height = Math.round(img.naturalHeight * scale);
+      ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
+      URL.revokeObjectURL(url);
+      setCapturedPhoto({ previewSrc: canvas.toDataURL('image/jpeg', 0.92), width: canvas.width, height: canvas.height });
+    };
+    img.onerror = () => URL.revokeObjectURL(url);
+    img.src = url;
+  }, []);
+
   const handleRetake = useCallback(() => {
     setCapturedPhoto(null);
   }, []);
@@ -161,7 +180,7 @@ export function CaptureScreen({ onRoundResultReady, online }: CaptureScreenProps
               <Timer durationSeconds={TURN_SECONDS} onExpire={handleTimeExpire} />
             </div>
           </div>
-          <CameraView onStreamReady={handleStreamReady} />
+          <CameraView onStreamReady={handleStreamReady} onUpload={handleUpload} />
           <div className="absolute inset-x-0 bottom-0 flex justify-center pb-8 pt-4">
             <CaptureButton onCapture={handleCapture} disabled={!videoReady} />
           </div>

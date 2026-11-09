@@ -4,9 +4,11 @@ import { useCamera } from '../../hooks/useCamera';
 interface CameraViewProps {
   /** Lets the parent grab the <video> element for capture without CameraView knowing about canvases. */
   onStreamReady?: (video: HTMLVideoElement) => void;
+  /** Fallback when the camera is denied or unsupported: lets the player pick a photo instead. */
+  onUpload?: (file: File) => void;
 }
 
-export function CameraView({ onStreamReady }: CameraViewProps) {
+export function CameraView({ onStreamReady, onUpload }: CameraViewProps) {
   const { status, videoRef, error, requestCamera } = useCamera();
 
   useEffect(() => {
@@ -15,6 +17,13 @@ export function CameraView({ onStreamReady }: CameraViewProps) {
     }
   }, [status, videoRef, onStreamReady]);
 
+  const upload = onUpload && (
+    <label className="mt-2 cursor-pointer rounded-full bg-pink-600 px-5 py-2 text-sm font-medium text-white">
+      Use a photo instead
+      <input type="file" accept="image/*" capture="environment" className="hidden" onChange={e => { const f = e.target.files?.[0]; if (f) onUpload(f); }} />
+    </label>
+  );
+
   if (status === 'unsupported') {
     return (
       <div className="flex h-full w-full flex-col items-center justify-center gap-2 bg-neutral-900 p-6 text-center text-white">
@@ -22,6 +31,7 @@ export function CameraView({ onStreamReady }: CameraViewProps) {
         <p className="text-sm text-neutral-300">
           This browser doesn't support camera access. Try opening this page in Safari or Chrome.
         </p>
+        {upload}
       </div>
     );
   }
@@ -39,6 +49,7 @@ export function CameraView({ onStreamReady }: CameraViewProps) {
         >
           Retry
         </button>
+        {upload}
       </div>
     );
   }
