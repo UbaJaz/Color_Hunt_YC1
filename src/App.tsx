@@ -9,11 +9,14 @@ import { GameStateProvider, useGameState } from './state/GameStateContext';
 import type { GameSettings } from './types/game';
 import { finalizeResults } from './utils/voting';
 
+const MAX_RETAKES = 3;
+
 type ScreenId = 'lobby' | 'calibration' | 'capture' | 'results' | 'voting' | 'leaderboard' | 'final';
 
 function AppShell() {
   const { currentRound, state, startGame, startRound, resetGame, recordVotes } = useGameState();
   const [screen, setScreen] = useState<ScreenId>('lobby');
+  const [retakesUsed, setRetakesUsed] = useState(0); // per turn; the capture screen remounts per retake so the timer restarts
 
   const handleStartGame = (settings: GameSettings) => {
     startGame(settings);
@@ -30,6 +33,7 @@ function AppShell() {
   };
 
   const handleNextPlayerTurnOrVoting = () => {
+    setRetakesUsed(0);
     // Check if there is another player after current turn advances
     if (currentRound && currentRound.currentPlayerIndex + 1 < state.players.length) {
       setScreen('capture');
@@ -51,6 +55,7 @@ function AppShell() {
    * keyed by round+playerIndex, so React remounts it fresh.
    */
   const handleRetake = () => {
+    setRetakesUsed(n => n + 1);
     setScreen('capture');
   };
 
@@ -79,9 +84,9 @@ function AppShell() {
       {screen === 'lobby' && <LobbyScreen onStartGame={handleStartGame} />}
       {screen === 'calibration' && <CalibrationScreen onCalibrationComplete={handleCalibrationComplete} />}
       {screen === 'capture' && (
-        <CaptureScreen key={`${currentRound?.roundNumber}-${currentRound?.currentPlayerIndex}`} onRoundResultReady={() => setScreen('results')} />
+        <CaptureScreen key={`${currentRound?.roundNumber}-${currentRound?.currentPlayerIndex}-${retakesUsed}`} onRoundResultReady={() => setScreen('results')} />
       )}
-      {screen === 'results' && <ResultsScreen onContinue={handleNextPlayerTurnOrVoting} onRetake={handleRetake} />}
+      {screen === 'results' && <ResultsScreen onContinue={handleNextPlayerTurnOrVoting} onRetake={handleRetake} retakesLeft={MAX_RETAKES - retakesUsed} />}
       {screen === 'voting' && <VotingScreen onVotingComplete={handleVotingComplete} />}
       {screen === 'leaderboard' && <LeaderboardScreen onNextRound={handleNextRound} />}
       {screen === 'final' && (

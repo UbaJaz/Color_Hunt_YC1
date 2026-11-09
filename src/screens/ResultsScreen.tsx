@@ -10,6 +10,8 @@ interface ResultsScreenProps {
   /** Day 7d: Called when a player chooses to retake due to poor lighting.
    *  Returns to CaptureScreen for the same player without advancing the turn. */
   onRetake: () => void;
+  /** Retakes remaining for this turn; the button disappears at 0. */
+  retakesLeft: number;
 }
 
 function rgbToHex({ r, g, b }: RGB): string {
@@ -17,7 +19,7 @@ function rgbToHex({ r, g, b }: RGB): string {
   return `#${toHex(r)}${toHex(g)}${toHex(b)}`.toUpperCase();
 }
 
-export function ResultsScreen({ onContinue, onRetake }: ResultsScreenProps) {
+export function ResultsScreen({ onContinue, onRetake, retakesLeft }: ResultsScreenProps) {
   const { state, currentRound, nextTurn } = useGameState();
   const player = state.players[currentRound!.currentPlayerIndex];
 
@@ -125,12 +127,12 @@ export function ResultsScreen({ onContinue, onRetake }: ResultsScreenProps) {
               </ul>
             )}
             {/* Day 7d: Retake button for poor lighting */}
-            {isPoorLighting && (
+            {isPoorLighting && retakesLeft > 0 && (
               <button
                 onClick={handleRetake}
                 className="mt-1 self-start rounded-full bg-orange-500/20 border border-orange-400/50 px-4 py-1.5 text-xs font-semibold text-orange-200 transition-opacity active:opacity-70"
               >
-                ↩ Retake
+                ↩ Retake ({retakesLeft} left)
               </button>
             )}
           </div>
