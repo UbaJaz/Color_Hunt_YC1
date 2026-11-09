@@ -77,6 +77,12 @@ export function CalibrationScreen({ onCalibrationComplete }: { onCalibrationComp
              <p className="text-sm opacity-80">Photograph a white/grey piece of paper</p>
              {error && <p className="mt-2 rounded-lg bg-red-600/80 px-3 py-1 text-sm">{error}</p>}
           </div>
+          <button
+            onClick={onCalibrationComplete}
+            className="absolute right-4 top-4 z-20 rounded-full bg-black/60 px-3 py-1 text-xs text-white"
+          >
+            Skip, use default
+          </button>
           <CameraView onStreamReady={handleStreamReady} />
           <div className="absolute inset-x-0 bottom-0 flex justify-center pb-8 pt-4">
             <CaptureButton onCapture={handleCapture} disabled={!videoReady} />

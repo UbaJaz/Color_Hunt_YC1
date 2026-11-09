@@ -2,7 +2,9 @@ import { ColorSwatch } from '../components/ui/ColorSwatch';
 import { CelebrationOverlay } from '../components/ui/CelebrationOverlay';
 import { useGameState } from '../state/GameStateContext';
 import { getRarityTier, isSuccessfulUnlock, RARITY_DISPLAY } from '@color-science';
+import { useEffect } from 'react';
 import { useCelebration } from '../hooks/useCelebration';
+import { chime } from '../utils/sound';
 import type { RGB } from '../types/color';
 
 interface ResultsScreenProps {
@@ -12,6 +14,13 @@ interface ResultsScreenProps {
   onRetake: () => void;
   /** Retakes remaining for this turn; the button disappears at 0. */
   retakesLeft: number;
+}
+
+function scoreLabel(score: number): string {
+  if (score >= 90) return 'Spot on!';
+  if (score >= 70) return 'Very close';
+  if (score >= 40) return 'Close';
+  return 'Not quite';
 }
 
 function rgbToHex({ r, g, b }: RGB): string {
@@ -35,6 +44,10 @@ export function ResultsScreen({ onContinue, onRetake, retakesLeft }: ResultsScre
     score: result?.score ?? null,
     rarityTier,
   });
+
+  useEffect(() => {
+    if ((result?.score ?? 0) >= 90 || rarityTier === 'rare' || rarityTier === 'ultra-rare') chime();
+  }, [result?.score, rarityTier]);
 
   // Day 7c: Unlock eligibility banner
   const unlockEligible =
@@ -83,10 +96,13 @@ export function ResultsScreen({ onContinue, onRetake, retakesLeft }: ResultsScre
                   {rarityDisplay.emoji} {rarityDisplay.label}
                 </span>
               )}
+              {rarityDisplay && (
+                <span className="text-[11px] text-neutral-500">{rarityDisplay.reason}</span>
+              )}
             </div>
           ) : (
             <div className="flex h-24 w-24 items-center justify-center rounded-2xl border border-dashed border-white/30 text-center text-xs text-neutral-500">
-              No pick
+              No capture
             </div>
           )}
         </div>
@@ -102,7 +118,7 @@ export function ResultsScreen({ onContinue, onRetake, retakesLeft }: ResultsScre
       <div className="flex w-full max-w-sm flex-col gap-4">
         <div className="flex gap-4 rounded-2xl bg-white/5 px-6 py-4 justify-around">
           <div className="text-center">
-            <p className="text-xs uppercase tracking-wide text-neutral-400">Score</p>
+            <p className="text-xs uppercase tracking-wide text-neutral-400">{result.score != null ? scoreLabel(result.score) : 'Score'}</p>
             <p className="text-xl font-semibold text-pink-400">
               {result.score != null ? `${Math.round(result.score)}%` : '—'}
             </p>

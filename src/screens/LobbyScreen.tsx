@@ -24,6 +24,7 @@ export function LobbyScreen({ onStartGame }: LobbyScreenProps) {
   const [roundCount, setRoundCount] = useState(3);
   const [difficulty, setDifficulty] = useState<Difficulty>('medium');
   const [useRandomColor, setUseRandomColor] = useState(false);
+  const [memoryMode, setMemoryMode] = useState(false);
 
   const handleAddPlayer = (e: React.FormEvent) => {
     e.preventDefault();
@@ -37,7 +38,7 @@ export function LobbyScreen({ onStartGame }: LobbyScreenProps) {
 
   const handleStart = () => {
     if (state.players.length === 0) return;
-    onStartGame({ roundCount, difficulty, useRandomColor });
+    onStartGame({ roundCount, difficulty, useRandomColor, memoryMode });
   };
 
   return (
@@ -115,6 +116,25 @@ export function LobbyScreen({ onStartGame }: LobbyScreenProps) {
           </button>
         </div>
 
+        {/* Memory mode */}
+        <div className="mb-5 flex items-center justify-between rounded-lg bg-white/5 px-4 py-3">
+          <div>
+            <p className="text-sm font-medium">Memory Mode</p>
+            <p className="text-xs text-neutral-400">Target hides after 4 seconds</p>
+          </div>
+          <button
+            onClick={() => setMemoryMode(v => !v)}
+            aria-label="Memory mode"
+            className={`relative h-6 w-11 rounded-full transition-colors ${memoryMode ? 'bg-pink-600' : 'bg-neutral-700'}`}
+          >
+            <span
+              className={`absolute top-0.5 left-0.5 h-5 w-5 rounded-full bg-white transition-transform ${
+                memoryMode ? 'translate-x-5' : 'translate-x-0'
+              }`}
+            />
+          </button>
+        </div>
+
         {/* Difficulty — only relevant when Random Colour Mode is on */}
         <div>
           <p className="text-sm text-neutral-400 mb-2">
@@ -138,6 +158,10 @@ export function LobbyScreen({ onStartGame }: LobbyScreenProps) {
           </div>
         </div>
       </div>
+
+      <p className="max-w-sm text-center text-xs text-neutral-400">
+        House rule: real objects only. No pointing the camera at another screen.
+      </p>
 
       <button
         onClick={handleStart}

@@ -1,9 +1,12 @@
+import { useEffect, useState } from 'react';
 import { ColorSwatch } from '../ui/ColorSwatch';
 import type { TargetColor } from '../../types/color';
 
 interface TargetColorBannerProps {
   targetColor: TargetColor;
   roundNumber: number;
+  /** Memory mode: hide the swatch after this many ms. */
+  hideSwatchAfterMs?: number;
 }
 
 const DIFFICULTY_BADGE: Record<string, string> = {
@@ -15,7 +18,14 @@ const DIFFICULTY_BADGE: Record<string, string> = {
 /** Shows the color the player needs to find, overlaid on the camera view.
  *  Day 6b: includes a difficulty badge so players immediately know how hard
  *  the round is before they start hunting. */
-export function TargetColorBanner({ targetColor, roundNumber }: TargetColorBannerProps) {
+export function TargetColorBanner({ targetColor, roundNumber, hideSwatchAfterMs }: TargetColorBannerProps) {
+  const [hidden, setHidden] = useState(false);
+  useEffect(() => {
+    if (!hideSwatchAfterMs) return;
+    const t = setTimeout(() => setHidden(true), hideSwatchAfterMs);
+    return () => clearTimeout(t);
+  }, [hideSwatchAfterMs]);
+
   return (
     <div className="absolute inset-x-0 top-0 z-10 flex items-center justify-between gap-3 bg-black/60 px-4 py-3 backdrop-blur-sm">
       <div>
@@ -29,7 +39,11 @@ export function TargetColorBanner({ targetColor, roundNumber }: TargetColorBanne
         </div>
         <p className="text-lg font-semibold text-white">{targetColor.name}</p>
       </div>
-      <ColorSwatch hex={targetColor.hex} label={targetColor.hex.toUpperCase()} size="sm" />
+      {hidden ? (
+        <p className="text-xs text-neutral-400">Remember it!</p>
+      ) : (
+        <ColorSwatch hex={targetColor.hex} label={targetColor.hex.toUpperCase()} size="sm" />
+      )}
     </div>
   );
 }

@@ -58,7 +58,7 @@ export function VotingScreen({ onVotingComplete }: { onVotingComplete: () => voi
     <div className="flex h-full w-full flex-col items-center overflow-y-auto bg-neutral-950 p-6 py-12 text-white">
       <h1 className="mb-2 text-2xl font-bold">{voter.name}, cast your votes</h1>
       <p className="mb-8 max-w-sm text-center text-sm text-neutral-400">
-        Is each object a "most unlikely item"? Thumbs up from the group grants a score multiplier. Skipping counts as no vote.
+        Is each object a "most unlikely item"? A thumbs up from most of the group adds up to 15 bonus points. Skipping counts as no vote.
       </p>
 
       <div className="flex w-full max-w-sm flex-col gap-6">

@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react';
+import { beep } from '../../utils/sound';
 
 export function Timer({ 
   durationSeconds = 60, 
@@ -8,6 +9,10 @@ export function Timer({
   onExpire: () => void; 
 }) {
   const [timeLeft, setTimeLeft] = useState(durationSeconds);
+
+  useEffect(() => {
+    if (timeLeft > 0 && timeLeft <= 5) beep(timeLeft === 1 ? 1200 : 800, 80);
+  }, [timeLeft]);
 
   useEffect(() => {
     if (timeLeft <= 0) {

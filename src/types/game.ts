@@ -30,6 +30,8 @@ export interface GameSettings {
   difficulty: Difficulty;
   /** When true, rounds use the procedural Lab-space generator instead of the curated preset list. */
   useRandomColor: boolean;
+  /** Memory mode: the target swatch is hidden a few seconds into each turn. */
+  memoryMode: boolean;
 }
 
 /**

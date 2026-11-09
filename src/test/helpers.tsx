@@ -33,7 +33,7 @@ export function stubPlayerIds() {
   vi.spyOn(crypto, 'randomUUID').mockImplementation(() => `p${++n}` as `${string}-${string}-${string}-${string}-${string}`);
 }
 
-export const SETTINGS = { roundCount: 3, difficulty: 'medium', useRandomColor: false } as const;
+export const SETTINGS = { roundCount: 3, difficulty: 'medium', useRandomColor: false, memoryMode: false } as const;
 
 export function makeResult(playerId: string, score: number, level: 'high' | 'low' = 'high'): RoundResult {
   return {

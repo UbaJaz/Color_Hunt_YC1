@@ -35,6 +35,14 @@ describe('game state', () => {
     expect(result.current.state.players[0].totalScore).toBe(80);
   });
 
+  it('restores a saved state', () => {
+    const { result } = setupTwoPlayers();
+    const saved = result.current.state;
+    act(() => result.current.resetGame());
+    act(() => result.current.loadState(saved));
+    expect(result.current.state).toEqual(saved);
+  });
+
   it('resets scores, rounds and settings on play again but keeps players', () => {
     const { result } = setupTwoPlayers();
     const [a] = result.current.state.players;

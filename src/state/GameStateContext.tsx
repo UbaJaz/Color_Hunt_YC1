@@ -10,6 +10,7 @@ type Action =
   | { type: 'ADD_PLAYER'; payload: { id: string; name: string } }
   | { type: 'REMOVE_PLAYER'; payload: { id: string } }
   | { type: 'RESET_GAME' }
+  | { type: 'LOAD_STATE'; payload: GameState }
   | { type: 'NEXT_TURN' }
   | { type: 'SET_CALIBRATION_MATRIX'; payload: CalibrationMatrix }
   | { type: 'RECORD_VOTES'; payload: { resultsWithVotes: RoundResult[] } };
@@ -88,6 +89,9 @@ function reducer(state: GameState, action: Action): GameState {
     case 'REMOVE_PLAYER': {
       return { ...state, players: state.players.filter(p => p.id !== action.payload.id) };
     }
+    case 'LOAD_STATE': {
+      return action.payload;
+    }
     case 'RESET_GAME': {
       // Play Again: keep players and calibration, wipe scores, rounds and settings.
       return { ...state, players: state.players.map(p => ({ ...p, totalScore: 0 })), rounds: [], settings: null };
@@ -135,6 +139,7 @@ interface GameStateContextValue {
   addPlayer: (name: string) => void;
   removePlayer: (id: string) => void;
   resetGame: () => void;
+  loadState: (state: GameState) => void;
   nextTurn: () => void;
   setCalibrationMatrix: (matrix: CalibrationMatrix) => void;
   recordVotes: (resultsWithVotes: RoundResult[]) => void;
@@ -150,6 +155,7 @@ export function GameStateProvider({ children }: { children: ReactNode }) {
   const recordResult = useCallback((result: RoundResult) => dispatch({ type: 'RECORD_RESULT', payload: result }), []);
   const addPlayer = useCallback((name: string) => dispatch({ type: 'ADD_PLAYER', payload: { id: crypto.randomUUID(), name } }), []);
   const removePlayer = useCallback((id: string) => dispatch({ type: 'REMOVE_PLAYER', payload: { id } }), []);
+  const loadState = useCallback((s: GameState) => dispatch({ type: 'LOAD_STATE', payload: s }), []);
   const resetGame = useCallback(() => dispatch({ type: 'RESET_GAME' }), []);
   const nextTurn = useCallback(() => dispatch({ type: 'NEXT_TURN' }), []);
   const setCalibrationMatrix = useCallback((matrix: CalibrationMatrix) => dispatch({ type: 'SET_CALIBRATION_MATRIX', payload: matrix }), []);
@@ -165,11 +171,12 @@ export function GameStateProvider({ children }: { children: ReactNode }) {
       addPlayer,
       removePlayer,
       resetGame,
+      loadState,
       nextTurn,
       setCalibrationMatrix,
       recordVotes,
     }),
-    [state, startGame, startRound, recordResult, addPlayer, removePlayer, resetGame, nextTurn, setCalibrationMatrix, recordVotes]
+    [state, startGame, startRound, recordResult, addPlayer, removePlayer, resetGame, loadState, nextTurn, setCalibrationMatrix, recordVotes]
   );
 
   return <GameStateContext.Provider value={value}>{children}</GameStateContext.Provider>;

@@ -4,10 +4,12 @@ import { CaptureButton } from '../components/camera/CaptureButton';
 import { PhotoPreview } from '../components/camera/PhotoPreview';
 import { TargetColorBanner } from '../components/camera/TargetColorBanner';
 import { useGameState } from '../state/GameStateContext';
-import { extractColorFromCanvas, rgbToLab, deltaE2000, deltaEToMatchScore, calculateConfidence, selectRegion } from '@color-science';
+import { extractColorFromCanvas, rgbToLab, deltaE2000, deltaEToMatchScore, calculateConfidence } from '@color-science';
 import type { CapturedPhoto } from '../types/capture';
 import type { TapSelection } from '../hooks/useTapSelection';
 import { Timer } from '../components/ui/Timer';
+
+const TURN_SECONDS = 45;
 
 interface CaptureScreenProps {
   onRoundResultReady: () => void;
@@ -99,35 +101,21 @@ export function CaptureScreen({ onRoundResultReady }: CaptureScreenProps) {
     [state.calibrationMatrix, player, currentRound, recordResult, onRoundResultReady]
   );
 
-  /**
-   * Fix 1: Timer expiry auto-confirm.
-   * Draws the current camera frame to canvas (regardless of whether the player
-   * had manually captured) then synthesises a center-pixel TapSelection and
-   * immediately confirms it. This prevents the game from stalling on
-   * PhotoPreview when the timer runs out. Timer resets on next mount
-   * because CaptureScreen is keyed by round+playerIndex in App.tsx.
-   */
+  /** Out of time: no capture means no points (auto-scoring the frame centre rewarded doing nothing). */
   const handleTimeExpire = useCallback(() => {
-    const video = videoElRef.current;
-    const canvas = canvasRef.current;
-    if (!video || !canvas || !videoReady || !player) return;
-
-    canvas.width = video.videoWidth;
-    canvas.height = video.videoHeight;
-    const ctx = canvas.getContext('2d');
-    if (!ctx) return;
-    ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
-
-    const cx = canvas.width / 2;
-    const cy = canvas.height / 2;
-    const region = selectRegion(cx, cy, canvas.width, canvas.height, 0.20);
-    handleConfirmSelection({
-      displayPoint: { x: cx, y: cy },
-      naturalPoint: { x: cx, y: cy },
-      naturalRegion: region,
-      displayRegion: region,
+    if (!player) return;
+    recordResult({
+      playerId: player.id,
+      region: null,
+      extractedRgb: null,
+      deltaE: null,
+      score: 0,
+      confidence: null,
+      bonusVotes: null,
+      finalScore: null,
     });
-  }, [videoReady, player, handleConfirmSelection]);
+    onRoundResultReady();
+  }, [player, recordResult, onRoundResultReady]);
 
   if (!currentRound || !player) return null;
 
@@ -145,11 +133,11 @@ export function CaptureScreen({ onRoundResultReady }: CaptureScreenProps) {
         />
       ) : (
         <div className="relative flex-1 bg-black">
-          <TargetColorBanner targetColor={currentRound.targetColor} roundNumber={currentRound.roundNumber} />
+          <TargetColorBanner targetColor={currentRound.targetColor} roundNumber={currentRound.roundNumber} hideSwatchAfterMs={state.settings?.memoryMode ? 4000 : undefined} />
           <div className="absolute top-24 inset-x-0 z-10 flex justify-center">
             <div className="bg-black/50 px-4 py-2 rounded-full backdrop-blur-md flex items-center gap-4">
               <span className="text-white font-medium">{player?.name}'s Turn</span>
-              <Timer durationSeconds={60} onExpire={handleTimeExpire} />
+              <Timer durationSeconds={TURN_SECONDS} onExpire={handleTimeExpire} />
             </div>
           </div>
           <CameraView onStreamReady={handleStreamReady} />

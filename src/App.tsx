@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { CaptureScreen } from './screens/CaptureScreen';
 import { ResultsScreen } from './screens/ResultsScreen';
 import { LobbyScreen } from './screens/LobbyScreen';
@@ -8,15 +8,36 @@ import { LeaderboardScreen } from './screens/LeaderboardScreen';
 import { GameStateProvider, useGameState } from './state/GameStateContext';
 import type { GameSettings } from './types/game';
 import { finalizeResults } from './utils/voting';
+import { clearSave, loadSave, writeSave } from './utils/save';
 
 const MAX_RETAKES = 3;
 
 type ScreenId = 'lobby' | 'calibration' | 'capture' | 'results' | 'voting' | 'leaderboard' | 'final';
 
 function AppShell() {
-  const { currentRound, state, startGame, startRound, resetGame, recordVotes } = useGameState();
+  const { currentRound, state, startGame, startRound, resetGame, recordVotes, loadState } = useGameState();
   const [screen, setScreen] = useState<ScreenId>('lobby');
   const [retakesUsed, setRetakesUsed] = useState(0); // per turn; the capture screen remounts per retake so the timer restarts
+
+  const [saved, setSaved] = useState(loadSave); // a game interrupted by a reload or closed tab
+
+  useEffect(() => {
+    if (screen === 'final') clearSave();
+    else if (screen !== 'lobby') writeSave({ state, screen, retakesUsed });
+  }, [state, screen, retakesUsed]);
+
+  const handleResume = () => {
+    if (!saved) return;
+    loadState(saved.state);
+    setRetakesUsed(saved.retakesUsed);
+    setScreen(saved.screen as ScreenId);
+    setSaved(null);
+  };
+
+  const handleDiscardSave = () => {
+    clearSave();
+    setSaved(null);
+  };
 
   const handleStartGame = (settings: GameSettings) => {
     startGame(settings);
@@ -81,7 +102,17 @@ function AppShell() {
 
   return (
     <div className="h-dvh w-dvw overflow-hidden bg-black" style={{ paddingTop: 'env(safe-area-inset-top)' }}>
-      {screen === 'lobby' && <LobbyScreen onStartGame={handleStartGame} />}
+      {screen === 'lobby' && saved && (
+        <div className="flex h-full w-full flex-col items-center justify-center gap-6 bg-neutral-950 p-6 text-center text-white">
+          <h1 className="text-2xl font-bold">Resume your game?</h1>
+          <p className="text-sm text-neutral-400">
+            {saved.state.players.map(p => p.name).join(', ')} · round {saved.state.rounds.length}
+          </p>
+          <button onClick={handleResume} className="rounded-full bg-pink-600 px-8 py-3 font-bold">Resume</button>
+          <button onClick={handleDiscardSave} className="text-sm text-neutral-400 underline">Start a new game</button>
+        </div>
+      )}
+      {screen === 'lobby' && !saved && <LobbyScreen onStartGame={handleStartGame} />}
       {screen === 'calibration' && <CalibrationScreen onCalibrationComplete={handleCalibrationComplete} />}
       {screen === 'capture' && (
         <CaptureScreen key={`${currentRound?.roundNumber}-${currentRound?.currentPlayerIndex}-${retakesUsed}`} onRoundResultReady={() => setScreen('results')} />
