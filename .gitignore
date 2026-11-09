@@ -29,3 +29,4 @@ packages/color-science/node_modules/
 
 *.onetoc2
 
+.env
