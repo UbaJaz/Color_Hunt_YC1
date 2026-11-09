@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { buildChallengeUrl, parseChallenge, seededRng } from './challenge';
+import { buildChallengeUrl, dailySeed, isDailySeed, parseChallenge, seededRng } from './challenge';
 import { getDynamicTargetColor, getRandomTargetColor } from '../data/targetColors';
 
 describe('seededRng', () => {
@@ -28,5 +28,16 @@ describe('challenge links', () => {
     expect(parseChallenge('')).toBeNull();
     expect(parseChallenge('?seed=<script>')).toBeNull();
     expect(parseChallenge('?seed=ok&rounds=999&diff=nope')).toMatchObject({ roundCount: 3, difficulty: 'medium' });
+  });
+});
+
+describe('daily seed', () => {
+  it('is stable within a day, changes between days and is a valid seed', () => {
+    expect(dailySeed(new Date(2026, 10, 9, 8))).toBe('d20261109');
+    expect(dailySeed(new Date(2026, 10, 9, 23))).toBe('d20261109');
+    expect(dailySeed(new Date(2026, 10, 10))).toBe('d20261110');
+    expect(parseChallenge('?seed=d20261109')?.seed).toBe('d20261109');
+    expect(isDailySeed('d20261109')).toBe(true);
+    expect(isDailySeed('abc123')).toBe(false);
   });
 });

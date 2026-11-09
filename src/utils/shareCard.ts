@@ -13,7 +13,7 @@ export function cardRows(players: CardPlayer[], max = 6): string[] {
     .map((p, i) => `${MEDALS[i] ?? `${i + 1}th`}  ${p.name.slice(0, 16)}  ${p.totalScore}`);
 }
 
-function drawCard(players: CardPlayer[], rounds: number): HTMLCanvasElement {
+function drawCard(players: CardPlayer[], rounds: number, subtitle = `${rounds} rounds`): HTMLCanvasElement {
   const canvas = document.createElement('canvas');
   canvas.width = 1080;
   canvas.height = 1080;
@@ -28,7 +28,7 @@ function drawCard(players: CardPlayer[], rounds: number): HTMLCanvasElement {
   ctx.font = 'bold 110px system-ui, sans-serif';
   ctx.fillText('ColorHunt', 540, 200);
   ctx.font = '48px system-ui, sans-serif';
-  ctx.fillText(`${rounds} rounds`, 540, 275);
+  ctx.fillText(subtitle, 540, 275);
   ctx.textAlign = 'left';
   ctx.font = 'bold 64px system-ui, sans-serif';
   cardRows(players).forEach((row, i) => ctx.fillText(row, 160, 430 + i * 105));
@@ -36,8 +36,8 @@ function drawCard(players: CardPlayer[], rounds: number): HTMLCanvasElement {
 }
 
 /** Share the result image through the native share sheet; fall back to downloading the PNG. */
-export async function shareResults(players: CardPlayer[], rounds: number): Promise<void> {
-  const blob = await new Promise<Blob | null>(resolve => drawCard(players, rounds).toBlob(resolve, 'image/png'));
+export async function shareResults(players: CardPlayer[], rounds: number, subtitle?: string): Promise<void> {
+  const blob = await new Promise<Blob | null>(resolve => drawCard(players, rounds, subtitle).toBlob(resolve, 'image/png'));
   if (!blob) return;
   const file = new File([blob], 'colorhunt-results.png', { type: 'image/png' });
   if (navigator.canShare?.({ files: [file] })) {

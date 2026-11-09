@@ -2,7 +2,8 @@ import { useState } from 'react';
 import { useGameState } from '../state/GameStateContext';
 import type { GameSettings } from '../types/game';
 import type { Difficulty } from '../types/color';
-import { buildChallengeUrl, makeSeed, parseChallenge } from '../utils/challenge';
+import { buildChallengeUrl, dailySeed, makeSeed, parseChallenge } from '../utils/challenge';
+import { loadStats } from '../utils/stats';
 
 interface LobbyScreenProps {
   onStartGame: (settings: GameSettings) => void;
@@ -51,6 +52,13 @@ export function LobbyScreen({ onStartGame, onPlayOnline }: LobbyScreenProps) {
   const handleStart = () => {
     if (state.players.length === 0) return;
     onStartGame({ roundCount, difficulty, useRandomColor, memoryMode, seed });
+  };
+
+  const today = dailySeed();
+  const todaysBest = loadStats().daily[today];
+  const handleDaily = () => {
+    if (state.players.length === 0) return;
+    onStartGame({ roundCount: 3, difficulty: 'medium', useRandomColor: false, memoryMode: false, seed: today });
   };
 
   return (
@@ -186,6 +194,13 @@ export function LobbyScreen({ onStartGame, onPlayOnline }: LobbyScreenProps) {
         className="rounded-full bg-white px-8 py-3 font-semibold text-black disabled:opacity-50 transition-transform active:scale-95"
       >
         Start Game
+      </button>
+      <button
+        onClick={handleDaily}
+        disabled={state.players.length === 0}
+        className="rounded-full border border-yellow-400/60 px-6 py-2 text-sm font-semibold text-yellow-300 disabled:opacity-50"
+      >
+        Daily challenge{todaysBest != null && ` · your best ${todaysBest}`}
       </button>
       {onPlayOnline && (
         <button onClick={onPlayOnline} className="text-sm text-neutral-400 underline">Play online with friends</button>

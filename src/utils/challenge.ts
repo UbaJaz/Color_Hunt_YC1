@@ -40,3 +40,8 @@ export function buildChallengeUrl(base: string, s: GameSettings & { seed: string
   if (s.memoryMode) q.set('memory', '1');
   return `${base}?${q}`;
 }
+
+/** One shared challenge per calendar day (local date), e.g. d20261109. Fits the seed pattern, so it is also a normal challenge seed. */
+export const dailySeed = (d = new Date()) => `d${d.getFullYear()}${String(d.getMonth() + 1).padStart(2, '0')}${String(d.getDate()).padStart(2, '0')}`;
+
+export const isDailySeed = (seed?: string) => /^d\d{8}$/.test(seed ?? '');

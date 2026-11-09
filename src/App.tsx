@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { CaptureScreen } from './screens/CaptureScreen';
 import { ResultsScreen } from './screens/ResultsScreen';
 import { LobbyScreen } from './screens/LobbyScreen';
@@ -9,6 +9,8 @@ import { GameStateProvider, useGameState } from './state/GameStateContext';
 import type { GameSettings } from './types/game';
 import { finalizeResults } from './utils/voting';
 import { shareResults } from './utils/shareCard';
+import { isDailySeed } from './utils/challenge';
+import { recordGame, type Stats } from './utils/stats';
 import { clearSave, loadSave, writeSave } from './utils/save';
 import { OnlineGame, loadOnlineSession } from './screens/OnlineGame';
 
@@ -27,6 +29,24 @@ function AppShell() {
     if (screen === 'final') clearSave();
     else if (screen !== 'lobby' && screen !== 'howto' && screen !== 'online') writeSave({ state, screen, retakesUsed });
   }, [state, screen, retakesUsed]);
+
+  // Fold the finished game into saved stats exactly once (effects run twice in dev StrictMode).
+  const [finalStats, setFinalStats] = useState<{ stats: Stats; newBest: boolean } | null>(null);
+  const recorded = useRef(false);
+  useEffect(() => {
+    if (screen !== 'final') {
+      recorded.current = false;
+      return;
+    }
+    if (recorded.current) return;
+    recorded.current = true;
+    const deltas = state.rounds.flatMap(r => r.results.map(x => x.deltaE)).filter((d): d is number => d != null);
+    setFinalStats(recordGame({
+      bestTotal: Math.max(0, ...state.players.map(p => p.totalScore)),
+      bestDeltaE: deltas.length ? Math.min(...deltas) : null,
+      dailySeed: isDailySeed(state.settings?.seed) ? state.settings?.seed : undefined,
+    }));
+  }, [screen, state]);
 
   const handleResume = () => {
     if (!saved) return;
@@ -157,7 +177,15 @@ function AppShell() {
               </div>
             ))}
           </div>
-          <button onClick={() => void shareResults(sortedForFinal, state.settings?.roundCount ?? 0)} className="text-sm text-neutral-300 underline">
+          {finalStats && (
+            <div className="text-center text-xs text-neutral-400">
+              {finalStats.newBest && <p className="mb-1 text-sm font-bold text-yellow-300">New personal best!</p>}
+              <p>
+                Best game {finalStats.stats.bestTotal} · Closest match ΔE {finalStats.stats.bestDeltaE?.toFixed(1) ?? '—'} · {finalStats.stats.gamesPlayed} played
+              </p>
+            </div>
+          )}
+          <button onClick={() => void shareResults(sortedForFinal, state.settings?.roundCount ?? 0, isDailySeed(state.settings?.seed) ? `Daily challenge ${state.settings?.seed?.slice(1)}` : undefined)} className="text-sm text-neutral-300 underline">
             Share results
           </button>
           <button
