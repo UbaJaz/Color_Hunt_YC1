@@ -1,4 +1,4 @@
-import { defineConfig } from 'vite'
+import { defineConfig } from 'vitest/config'
 import react from '@vitejs/plugin-react'
 import path from 'path'
 
@@ -13,6 +13,7 @@ export default defineConfig({
       '@color-science': path.resolve(__dirname, './packages/color-science/dist/browser.js'),
     },
   },
+  test: { environment: 'jsdom', include: ['src/**/*.test.{ts,tsx}'] },
   server: {
     allowedHosts: ['.ngrok-free.dev'],
   },
