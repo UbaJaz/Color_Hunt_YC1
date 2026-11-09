@@ -34,6 +34,17 @@ describe('host reducer', () => {
     expect(start('bogus')).toBeTruthy();
   });
 
+  it('records whitelisted reactions from players only and keeps just the latest few', () => {
+    let s = playing();
+    s = hostReduce(s, 'a', { type: 'REACT', emoji: '🔥' });
+    expect(s.reactions).toEqual([{ id: 1, from: 'a', emoji: '🔥' }]);
+    expect(hostReduce(s, 'a', { type: 'REACT', emoji: '<script>' })).toBe(s);
+    expect(hostReduce(s, 'stranger', { type: 'REACT', emoji: '🔥' })).toBe(s);
+    for (let i = 0; i < 10; i++) s = hostReduce(s, 'b', { type: 'REACT', emoji: '👏' });
+    expect(s.reactions).toHaveLength(6);
+    expect(s.reactions![5].id).toBe(11);
+  });
+
   it('only the host can start', () => {
     expect(run(lobby(), ['a', { type: 'START', settings: { ...SETTINGS } }]).phase).toBe('lobby');
     expect(playing().phase).toBe('playing');

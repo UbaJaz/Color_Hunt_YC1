@@ -8,6 +8,15 @@ import { finalizeResults, type Ballots, type Vote } from '../utils/voting';
 
 export type Phase = 'lobby' | 'playing' | 'voting' | 'leaderboard' | 'final';
 
+export const REACTIONS = ['👏', '😂', '🔥', '😮', '🎨', '👍'] as const;
+export const MAX_REACTIONS = 6;
+
+export interface Reaction {
+  id: number;
+  from: string;
+  emoji: string;
+}
+
 /** Full room state. The host owns it and rebroadcasts snapshots; clients only render it. */
 export interface OnlineState {
   code: string;
@@ -17,6 +26,8 @@ export interface OnlineState {
   settings: GameSettings | null;
   rounds: Round[];
   ballots: Ballots;
+  /** The last few emoji reactions, newest last. Optional so sessions saved before reactions still load. */
+  reactions?: Reaction[];
 }
 
 /** What a client may ask for. Scores are never sent: the host derives them from the colour. */
@@ -27,7 +38,8 @@ export type Intent =
   | { type: 'VOTES'; votes: Record<string, Vote> }
   | { type: 'FORCE' }
   | { type: 'NEXT' }
-  | { type: 'AGAIN' };
+  | { type: 'AGAIN' }
+  | { type: 'REACT'; emoji: string };
 
 export const MAX_PLAYERS = 8;
 
@@ -40,6 +52,7 @@ export function createRoom(code: string, hostId: string, hostName: string): Onli
     settings: null,
     rounds: [],
     ballots: {},
+    reactions: [],
   };
 }
 
@@ -105,7 +118,7 @@ export function hostReduce(state: OnlineState, from: string, intent: Intent, pic
       if (!isHost || state.phase !== 'lobby') return state;
       const s = intent.settings;
       const settings: GameSettings = { roundCount: Math.min(Math.max(Math.floor(s.roundCount) || 3, 1), 10), difficulty: s.difficulty, useRandomColor: !!s.useRandomColor, memoryMode: !!s.memoryMode, themes: !!s.themes, pack: PACKS.includes(s.pack as Pack) ? s.pack : 'all', seed: typeof s.seed === "string" && /^[a-z0-9]{1,12}$/i.test(s.seed) ? s.seed : undefined };
-      const next = { ...state, settings, rounds: [] as Round[], ballots: {}, phase: 'playing' as Phase };
+      const next = { ...state, settings, rounds: [] as Round[], ballots: {}, reactions: [], phase: 'playing' as Phase };
       return { ...next, rounds: [newRound(next, pick)] };
     }
     case 'SUBMIT': {
@@ -141,9 +154,16 @@ export function hostReduce(state: OnlineState, from: string, intent: Intent, pic
       if (state.rounds.length >= (state.settings?.roundCount ?? 0)) return { ...state, phase: 'final' };
       return { ...state, phase: 'playing', ballots: {}, rounds: [...state.rounds, newRound(state, pick)] };
     }
+    case 'REACT': {
+      // Cosmetic only: a fixed emoji whitelist, nothing the client sends is stored as-is.
+      if (!isPlayer || !(REACTIONS as readonly string[]).includes(intent.emoji)) return state;
+      const prev = state.reactions ?? [];
+      const id = (prev[prev.length - 1]?.id ?? 0) + 1;
+      return { ...state, reactions: [...prev, { id, from, emoji: intent.emoji }].slice(-MAX_REACTIONS) };
+    }
     case 'AGAIN': {
       if (!isHost || state.phase !== 'final') return state;
-      return { ...state, phase: 'lobby', rounds: [], settings: null, ballots: {}, players: state.players.map(p => ({ ...p, totalScore: 0 })) };
+      return { ...state, phase: 'lobby', rounds: [], settings: null, ballots: {}, reactions: [], players: state.players.map(p => ({ ...p, totalScore: 0 })) };
     }
     default:
       return state;

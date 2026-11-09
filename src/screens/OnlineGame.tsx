@@ -6,7 +6,7 @@ import { CaptureScreen } from './CaptureScreen';
 import { CalibrationScreen } from './CalibrationScreen';
 import { ColorSwatch } from '../components/ui/ColorSwatch';
 import { newIdentity, signIntent, signState, verifyIntent, verifyState, type AuthRegistry, type Identity } from '../net/auth';
-import { createRoom, hostReduce, type Intent, type OnlineState } from '../net/host';
+import { createRoom, hostReduce, REACTIONS, type Intent, type OnlineState } from '../net/host';
 import { makeRoomCode, onlineConfigured, openRoom, type RoomConn } from '../net/room';
 import type { RGB } from '../types/color';
 import { PACKS, type GameSettings } from '../types/game';
@@ -39,7 +39,7 @@ export const loadOnlineSession = (): Session | null => {
 const saveSession = (s: Session | null) => (s ? sessionStorage.setItem(KEY, JSON.stringify(s)) : sessionStorage.removeItem(KEY));
 
 const hex = ({ r, g, b }: RGB) => `#${[r, g, b].map(n => Math.round(n).toString(16).padStart(2, '0')).join('')}`.toUpperCase();
-const shell = 'flex h-full w-full flex-col items-center overflow-y-auto bg-neutral-950 p-6 py-10 text-white gap-6';
+const shell = 'flex h-full w-full flex-col items-center overflow-y-auto bg-neutral-950 p-6 py-10 pb-28 text-white gap-6';
 const primary = 'rounded-full bg-pink-600 px-8 py-3 font-bold disabled:opacity-50';
 
 function useRoom(session: Session, onSession: (s: Session) => void) {
@@ -157,6 +157,29 @@ function Standings({ state }: { state: OnlineState }) {
   );
 }
 
+/** Emoji buttons plus the latest reactions. Sending is throttled to one a second so the room is not flooded. */
+function ReactionBar({ state, send }: { state: OnlineState; send: (i: Intent) => void }) {
+  const last = useRef(0);
+  const nameOf = (id: string) => state.players.find(p => p.id === id)?.name ?? 'Spectator';
+  const react = (emoji: string) => {
+    if (Date.now() - last.current < 1000) return;
+    last.current = Date.now();
+    send({ type: 'REACT', emoji });
+  };
+  return (
+    <div className="absolute inset-x-0 bottom-0 z-40 flex flex-col items-center gap-1 bg-black/70 px-3 py-2 backdrop-blur-sm" style={{ paddingBottom: 'max(0.5rem, env(safe-area-inset-bottom))' }}>
+      <p aria-live="polite" className="h-4 max-w-full truncate text-xs text-neutral-300">
+        {(state.reactions ?? []).slice(-4).map(r => `${nameOf(r.from)} ${r.emoji}`).join('   ')}
+      </p>
+      <div className="flex gap-2">
+        {REACTIONS.map(e => (
+          <button key={e} onClick={() => react(e)} aria-label={`React ${e}`} className="rounded-full bg-white/10 px-3 py-1 text-xl active:scale-90">{e}</button>
+        ))}
+      </div>
+    </div>
+  );
+}
+
 function Room({ session, onSession, onLeave }: { session: Session; onSession: (s: Session) => void; onLeave: () => void }) {
   const room = useRoom(session, onSession);
   return (
@@ -168,6 +191,7 @@ function Room({ session, onSession, onLeave }: { session: Session; onSession: (s
         </div>
       )}
       <RoomView session={session} onLeave={onLeave} room={room} />
+      {room.state && ['voting', 'leaderboard', 'final'].includes(room.state.phase) && room.state.players.some(p => p.id === session.playerId) && <ReactionBar state={room.state} send={room.send} />}
     </div>
   );
 }
