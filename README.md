@@ -11,7 +11,22 @@ ColorHunt is a real-time color-matching game for groups of friends playing eithe
 3. **Capture:** each round has a random target colour. On your turn, point the camera at a real object you think matches and capture it (you can retake).
 4. **Results:** the game extracts the object's colour, scores the match with CIEDE2000 and assigns a rarity tier. Pass the phone on.
 5. **Voting:** once everyone has played, players vote for bonus points.
-6. **Leaderboard:** scores add up across rounds.
+6. **Reveal and leaderboard:** the target is shown next to every pick with how close it was and where the points came from. Scores add up across rounds.
+
+### Scoring
+
+Colour match (0-100, from CIEDE2000) + vote bonus (0-15) + **spot-on bonus** (+5 under deltaE 2, +3 under 4) + **streak bonus** (+3 / +5 / +8 for 2 / 3 / 4+ rounds in a row scoring 80 or more).
+
+### Game options
+
+- **Colour packs:** All, Nature, Pastel, Neon (preset rounds only).
+- **Theme prompts:** each round says where to hunt ("Find it in the kitchen").
+- **Two-colour rounds:** find a warm and a cool object in 60 seconds; the round scores the average.
+- **Memory mode, random colours, difficulty, 3/5/7 rounds.**
+- **Daily challenge:** one fixed seed per calendar day (lobby button, or "Today's daily" in an online room); your best score and daily streak are kept on the device.
+- **Preferences:** colour-blind aid (colour names and "lighter / redder" hints), sound and vibration toggles.
+
+The app is an installable PWA (manifest plus an offline-fallback service worker that always tries the network first).
 
 ## Setup and run
 
@@ -117,9 +132,9 @@ The following items were intentionally deferred and are not silently dropped:
 - **Real mid-range phone perf testing** — full harness runs in 226 ms on a dev machine; the same pipeline running in-browser on a mid-range Android or iPhone has not been benchmarked. Camera frames are smaller than the 1920 × 1000 px test images, so this is expected to be fast, but unverified.
 - **Cross-device / cross-lighting condition testing** — synthetic and 3-JPEG test data only. No testing across different ambient light conditions, phone cameras, or capture distances yet.
 - **5+ person friend testing session** — no live player testing done. The rarity and scoring thresholds are calibrated from lab data only.
-- **White-balance calibration UI (Day 6, never shipped)** — `estimateWhiteBalance()` and `applyCalibration()` are implemented and tested in isolation but the UI to trigger calibration was deferred and is not wired up in `CaptureScreen.tsx`.
-- **Audio feedback** — not implemented.
-- **iOS `navigator.vibrate()` non-functional workaround** — vibrate is not supported in Safari/iOS. No fallback currently implemented.
+- **iOS `navigator.vibrate()`** — not supported in Safari/iOS, so vibration cues do nothing there (sound still works).
+- **Host migration** — an online game ends if the host's phone sleeps or leaves; clients show a "host disconnected" banner.
+- **Real-phone checks** — camera, white-balance lock, share sheet, photo-upload fallback and PWA install have not been verified on physical devices.
 - **Rarity chroma-only separation** — see Known Limitations above.
 
 ---
