@@ -11,6 +11,7 @@ import type { RGB } from '../types/color';
 import { PACKS, type GameSettings } from '../types/game';
 import type { Vote } from '../utils/voting';
 import { shareResults } from '../utils/shareCard';
+import { PrefsPanel } from '../components/ui/PrefsPanel';
 import { combineParts, scorePart } from '../utils/pair';
 import { dailySeed, makeSeed, parseChallenge } from '../utils/challenge';
 
@@ -492,6 +493,7 @@ export function OnlineGame({ onExit }: { onExit: () => void }) {
           </div>
         </div>
       )}
+      <PrefsPanel />
       <button onClick={onExit} className="text-sm text-neutral-400 underline">Back to pass-and-play</button>
     </div>
   );

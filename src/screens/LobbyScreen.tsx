@@ -3,6 +3,7 @@ import { useGameState } from '../state/GameStateContext';
 import { PACKS, type GameSettings, type Pack } from '../types/game';
 import type { Difficulty } from '../types/color';
 import { buildChallengeUrl, dailySeed, makeSeed, parseChallenge } from '../utils/challenge';
+import { PrefsPanel } from '../components/ui/PrefsPanel';
 import { activeDailyStreak, loadStats } from '../utils/stats';
 
 interface LobbyScreenProps {
@@ -236,6 +237,8 @@ export function LobbyScreen({ onStartGame, onPlayOnline }: LobbyScreenProps) {
       <button onClick={copyChallenge} className="text-sm text-neutral-300 underline">
         {copied ? 'Link copied' : 'Copy challenge link'}
       </button>
+
+      <PrefsPanel />
 
       <p className="max-w-sm text-center text-xs text-neutral-400">
         House rule: real objects only. No pointing the camera at another screen.

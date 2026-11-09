@@ -2,6 +2,8 @@ import { calculateVoteBonus } from '@color-science';
 import type { RGB, TargetColor } from '../../types/color';
 import type { RoundResult } from '../../types/game';
 import { precisionBonus, streakBonus } from '../../utils/voting';
+import { describeDifference, nearestColorName } from '../../utils/colorName';
+import { getPrefs } from '../../utils/prefs';
 
 const hex = ({ r, g, b }: RGB) => '#' + [r, g, b].map(n => n.toString(16).padStart(2, '0')).join('').toUpperCase();
 
@@ -28,6 +30,7 @@ function Swatch({ rgb, label }: { rgb: RGB | null; label: string }) {
 export function RoundReveal({ target, target2, results, nameOf }: RoundRevealProps) {
   const sorted = [...results].sort((a, b) => (b.finalScore ?? 0) - (a.finalScore ?? 0));
   const targets = target2 ? [target, target2] : [target];
+  const aid = getPrefs().colourBlind;
   return (
     <div className="flex w-full max-w-sm flex-col gap-3">
       <div className="flex items-center gap-3 rounded-xl bg-white/10 p-3">
@@ -42,6 +45,9 @@ export function RoundReveal({ target, target2, results, nameOf }: RoundRevealPro
         const vote = r.bonusVotes ? calculateVoteBonus(r.bonusVotes) : 0;
         const precise = precisionBonus(r.deltaE);
         const streak = streakBonus(r.streak ?? 0);
+        const hints = aid
+          ? (r.pair ? r.pair.map(p => p.extractedRgb) : [r.extractedRgb]).map((p, k) => (p ? `${nearestColorName(p)}${describeDifference(p, targets[k].rgb) ? `, ${describeDifference(p, targets[k].rgb)}` : ''}` : 'none')).join(' / ')
+          : '';
         const picks = r.pair ? r.pair.map(p => p.extractedRgb) : [r.extractedRgb];
         return (
           <div key={r.playerId} className="flex items-center justify-between rounded-xl bg-white/5 p-3">
@@ -54,6 +60,7 @@ export function RoundReveal({ target, target2, results, nameOf }: RoundRevealPro
                 <span className="block text-xs text-neutral-400">
                   {r.extractedRgb ? `${picks.map(p => (p ? hex(p) : 'none')).join(' ')}${r.deltaE != null ? ` · ΔE ${r.deltaE.toFixed(1)}` : ''}` : 'No capture'}
                 </span>
+                {hints && <span className="block text-xs font-semibold text-yellow-200">{hints}</span>}
               </span>
             </span>
             <span className="flex flex-col items-end">
