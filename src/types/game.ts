@@ -55,6 +55,8 @@ export interface GameSettings {
  */
 /** One capture of a two-colour round, scored on its own. */
 export interface PairPart {
+  /** Small JPEG of the whole photo (pass-and-play only). */
+  photo?: string;
   extractedRgb: RGB | null;
   deltaE: number | null;
   score: number;
@@ -73,6 +75,8 @@ export interface RoundResult {
   streak?: number;
   /** Two-colour rounds: both captures. The main extractedRgb/deltaE/score fields hold the first colour and the average. */
   pair?: PairPart[];
+  /** Small JPEG of the whole photo with the sampled spot ringed (pass-and-play only; online sends colours, not photos). */
+  photo?: string;
   debugData?: ExtractionDebugData | null;
 }
 

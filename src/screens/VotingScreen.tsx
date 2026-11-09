@@ -71,6 +71,9 @@ export function VotingScreen({ onVotingComplete }: { onVotingComplete: () => voi
           return (
             <div key={result.playerId} className="flex flex-col items-center gap-4 rounded-2xl bg-white/10 p-4">
               <h2 className="text-lg font-semibold">{owner.name}'s Object</h2>
+              {[result.photo, result.pair?.[1]?.photo].filter((p): p is string => !!p).map((photo, i) => (
+                <img key={i} src={photo} alt={`${owner.name}'s object${i ? ' (second colour)' : ''}`} className="max-h-56 w-full rounded-xl object-contain bg-black" />
+              ))}
               <div className="flex gap-4">
                 <ColorSwatch hex={rgbToHex(result.extractedRgb)} label="Extracted" />
                 {result.pair?.[1]?.extractedRgb && <ColorSwatch hex={rgbToHex(result.pair[1].extractedRgb)} label="Second" />}

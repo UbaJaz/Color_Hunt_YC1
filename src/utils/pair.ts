@@ -13,9 +13,9 @@ export function scorePart(rgb: RGB | null, target: RGB): PairPart {
  * Fold the captures of a two-colour round into one result: the score is the average (a missing capture counts 0),
  * deltaE is averaged only when every capture exists so a half-finished round never earns the precision bonus.
  */
-export function combineParts(parts: PairPart[]): Pick<RoundResult, 'extractedRgb' | 'deltaE' | 'score' | 'pair'> {
+export function combineParts(parts: PairPart[]): Pick<RoundResult, 'extractedRgb' | 'deltaE' | 'score' | 'pair' | 'photo'> {
   const score = parts.reduce((sum, p) => sum + p.score, 0) / parts.length;
   const complete = parts.every(p => p.deltaE != null);
   const deltaE = complete ? parts.reduce((sum, p) => sum + p.deltaE!, 0) / parts.length : null;
-  return { extractedRgb: parts[0].extractedRgb, deltaE, score, pair: parts };
+  return { extractedRgb: parts[0].extractedRgb, deltaE, score, pair: parts, photo: parts[0].photo };
 }

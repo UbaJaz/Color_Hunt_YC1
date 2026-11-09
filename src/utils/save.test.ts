@@ -32,4 +32,14 @@ describe('save', () => {
     writeSave({ state: { ...state, settings: null }, screen: 'capture', retakesUsed: 0 });
     expect(loadSave()).toBeNull();
   });
+
+  it('keeps photos for the current round but drops them from earlier rounds', () => {
+    const result = (photo: string) => ({ playerId: 'p1', region: null, extractedRgb: null, deltaE: null, score: 0, confidence: null, bonusVotes: null, finalScore: null, photo, pair: [{ extractedRgb: null, deltaE: null, score: 0, photo }] });
+    const rounds = [1, 2].map(n => ({ roundNumber: n, targetColor: {}, results: [result(`img${n}`)], currentPlayerIndex: 0 }));
+    writeSave({ state: { ...state, rounds } as unknown as GameState, screen: 'voting', retakesUsed: 0 });
+    const saved = loadSave()!.state.rounds;
+    expect(saved[0].results[0].photo).toBeUndefined();
+    expect(saved[0].results[0].pair![0].photo).toBeUndefined();
+    expect(saved[1].results[0].photo).toBe('img2');
+  });
 });

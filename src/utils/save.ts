@@ -29,9 +29,22 @@ export function loadSave(): SavedGame | null {
   }
 }
 
+/** Photos are only needed while voting on the current round; older rounds drop them so the save stays small. */
+function slim(state: GameState): GameState {
+  const last = state.rounds.length - 1;
+  return {
+    ...state,
+    rounds: state.rounds.map((round, i) =>
+      i === last
+        ? round
+        : { ...round, results: round.results.map(({ photo: _photo, pair, ...rest }) => ({ ...rest, ...(pair && { pair: pair.map(({ photo: _p, ...part }) => part) }) })) }
+    ),
+  };
+}
+
 export function writeSave(save: SavedGame) {
   try {
-    localStorage.setItem(KEY, JSON.stringify(save));
+    localStorage.setItem(KEY, JSON.stringify({ ...save, state: slim(save.state) }));
   } catch {
     // storage full or blocked: the game still works, it just can't resume
   }

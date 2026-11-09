@@ -20,6 +20,8 @@ test('two players play a full pass-and-play round with voting', async ({ page })
 
   for (const name of ['Ann', 'Bob']) {
     await page.getByRole('button', { name: `I'm ${name}` }).click();
+    const other = name === 'Ann' ? 'Bob' : 'Ann';
+    await expect(page.getByRole('img', { name: `${other}'s object` })).toBeVisible(); // the whole photo, not just the swatch
     await page.getByRole('button', { name: /Done|Calculate/ }).click();
   }
 

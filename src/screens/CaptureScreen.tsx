@@ -12,15 +12,16 @@ import type { RGB, TargetColor } from '../types/color';
 import type { PairPart } from '../types/game';
 import { combineParts } from '../utils/pair';
 import { tick } from '../utils/sound';
+import { makeThumbnail } from '../utils/photo';
 
 const TURN_SECONDS = 45;
 const PAIR_TURN_SECONDS = 60;
 
 type Extraction = ReturnType<typeof extractColorFromCanvas>;
 
-function partOf(ex: Extraction, target: RGB): PairPart {
+function partOf(ex: Extraction, target: RGB, photo?: string): PairPart {
   const deltaE = deltaE2000(ex.extractedLab, rgbToLab(target));
-  return { extractedRgb: ex.extractedRgb, deltaE, score: deltaEToMatchScore(deltaE) };
+  return { extractedRgb: ex.extractedRgb, deltaE, score: deltaEToMatchScore(deltaE), photo };
 }
 
 /** Online play: the host scores, so this screen only reports the extracted colour (null = timed out). */
@@ -49,7 +50,7 @@ export function CaptureScreen({ onRoundResultReady, online }: CaptureScreenProps
   const [videoReady, setVideoReady] = useState(false);
   // Two-colour rounds share ONE deadline across both captures; the Timer remounts when the camera comes back.
   const [pairDeadline] = useState(() => Date.now() + PAIR_TURN_SECONDS * 1000);
-  const [first, setFirst] = useState<{ extraction: Extraction } | null>(null); // two-colour rounds: the warm capture, waiting for the cool one
+  const [first, setFirst] = useState<{ extraction: Extraction; photo?: string } | null>(null); // two-colour rounds: the warm capture, waiting for the cool one
 
   const player = useMemo(() => (online ? { id: 'me', name: online.playerName } : state.players[currentRound!.currentPlayerIndex]), [online, state.players, currentRound]);
 
@@ -116,10 +117,12 @@ export function CaptureScreen({ onRoundResultReady, online }: CaptureScreenProps
         state.calibrationMatrix || undefined
       );
       const second = currentRound.targetColor2;
+      // The canvas is overwritten by the next capture, so the thumbnail is taken now.
+      const photo = online ? undefined : makeThumbnail(canvas, selection.naturalPoint);
 
       // Two-colour round: keep the warm capture and go back to the camera for the cool one.
       if (second && !first) {
-        setFirst({ extraction });
+        setFirst({ extraction, photo });
         setCapturedPhoto(null);
         return;
       }
@@ -136,8 +139,8 @@ export function CaptureScreen({ onRoundResultReady, online }: CaptureScreenProps
       // Smooth curve (dE 5 -> 90, 15 -> 50, 30 -> 20, 60 -> ~6). The old `100 - deltaE`
       // gave ~40 points for a completely wrong hue, so every match looked okay.
       const scores = first && second
-        ? combineParts([partOf(first.extraction, currentRound.targetColor.rgb), partOf(extraction, second.rgb)])
-        : (({ extractedRgb, deltaE, score }) => ({ extractedRgb, deltaE, score }))(partOf(extraction, currentRound.targetColor.rgb));
+        ? combineParts([partOf(first.extraction, currentRound.targetColor.rgb, first.photo), partOf(extraction, second.rgb, photo)])
+        : (({ extractedRgb, deltaE, score, photo: shot }) => ({ extractedRgb, deltaE, score, photo: shot }))(partOf(extraction, currentRound.targetColor.rgb, photo));
 
       recordResult({
         playerId: player.id,
