@@ -8,7 +8,7 @@ import { rgbToLab, labToRgb } from './colorConversion.js';
 import { deltaE2000, deltaEToScore, deltaEToMatchScore } from './ciede2000.js';
 import { RGB, Lab } from './types.js';
 import { estimateWhiteBalance, applyCalibration, validateCalibrationCard } from './calibration.js';
-import { calculateBonusMultiplier, calculateVoteBonus, VoteTally } from './bonusVoting.js';
+import { calculateVoteBonus } from './bonusVoting.js';
 import { calculateConfidence } from './confidence.js';
 import { getRarityTier, isSuccessfulUnlock } from './rarity.js';
 import path from 'path';
@@ -458,40 +458,21 @@ function testCalibration() {
  */
 function testBonusVoting() {
   console.log('\n' + '='.repeat(80));
-  console.log('BONUS VOTING MULTIPLIER TEST');
+  console.log('VOTE BONUS TEST');
   console.log('='.repeat(80));
 
-  const testCases: { votes: VoteTally; expected: number; description: string }[] = [
-    { votes: { thumbsUp: 0, thumbsDown: 0 }, expected: 1.0, description: '0 votes â†’ 1.0' },
-    { votes: { thumbsUp: 5, thumbsDown: 5 }, expected: 1.0, description: '5 up, 5 down (50%) â†’ 1.0' },
-    { votes: { thumbsUp: 10, thumbsDown: 0 }, expected: 2.0, description: '10 up, 0 down (100%) â†’ 2.0' },
-    { votes: { thumbsUp: 7, thumbsDown: 3 }, expected: 1.4, description: '7 up, 3 down (70%) â†’ 1.4' },
-    { votes: { thumbsUp: 2, thumbsDown: 8 }, expected: 1.0, description: '2 up, 8 down (20%) â†’ 1.0 (floor)' }
+  const cases: [number, number, number][] = [
+    [0, 0, 0], [5, 5, 0], [10, 0, 15], [3, 1, 8], [7, 3, 6], [1, 9, 0],
   ];
-
-  const bonusOk = calculateVoteBonus({ thumbsUp: 0, thumbsDown: 0 }) === 0 &&
-    calculateVoteBonus({ thumbsUp: 5, thumbsDown: 5 }) === 0 &&
-    calculateVoteBonus({ thumbsUp: 10, thumbsDown: 0 }) === 15 &&
-    calculateVoteBonus({ thumbsUp: 3, thumbsDown: 1 }) === 8 &&
-    calculateVoteBonus({ thumbsUp: 1, thumbsDown: 9 }) === 0;
-  console.log(`  ${bonusOk ? 'PASS' : 'FAIL'}: additive vote bonus 0..15`);
-  if (!bonusOk) process.exitCode = 1;
-
-  console.log('\n' + '-'.repeat(80));
-  console.log(`| ${'Description'.padEnd(35)} | ${'Up'.padEnd(5)} | ${'Down'.padEnd(5)} | ${'Expected'.padEnd(10)} | ${'Actual'.padEnd(10)} | ${'Result'.padEnd(10)} |`);
-  console.log('-'.repeat(80));
-
-  let passCount = 0;
-  for (const testCase of testCases) {
-    const actual = calculateBonusMultiplier(testCase.votes);
-    const passed = Math.abs(actual - testCase.expected) < 0.01;
-    if (passed) passCount++;
-    console.log(`| ${testCase.description.padEnd(35)} | ${testCase.votes.thumbsUp.toString().padEnd(5)} | ${testCase.votes.thumbsDown.toString().padEnd(5)} | ${testCase.expected.toFixed(1).padEnd(10)} | ${actual.toFixed(1).padEnd(10)} | ${passed ? 'âœ“ PASS' : 'âœ— FAIL'}${''.padEnd(6)} |`);
+  let pass = 0;
+  for (const [up, down, expected] of cases) {
+    const actual = calculateVoteBonus({ thumbsUp: up, thumbsDown: down });
+    const ok = actual === expected;
+    if (ok) pass++;
+    console.log(`  ${ok ? 'PASS' : 'FAIL'}: ${up} up / ${down} down -> +${actual} (expected +${expected})`);
   }
-
-  console.log('-'.repeat(80));
-  console.log(`Summary: ${passCount}/${testCases.length} tests passed`);
-  console.log('-'.repeat(80));
+  console.log(`Summary: ${pass}/${cases.length} tests passed`);
+  if (pass !== cases.length) process.exitCode = 1;
 }
 
 /**
