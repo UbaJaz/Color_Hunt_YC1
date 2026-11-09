@@ -3,6 +3,7 @@ import type { GameState, GameSettings, Player, Round, RoundResult } from '../typ
 import { getRandomTargetColor, getDynamicTargetColor } from '../data/targetColors';
 import type { CalibrationMatrix } from '@color-science';
 import { seededRng } from '../utils/challenge';
+import { pickTheme } from '../data/themes';
 
 type Action =
   | { type: 'START_GAME'; payload: GameSettings }
@@ -36,6 +37,7 @@ function createRound(roundNumber: number, settings: GameSettings | null, exclude
     targetColor: pickTargetColor(settings, excludeColorId, roundNumber),
     results: [],
     currentPlayerIndex: 0,
+    ...(settings?.themes && { theme: pickTheme(settings.seed ? seededRng(settings.seed, roundNumber + 1000) : undefined) }),
   };
 }
 

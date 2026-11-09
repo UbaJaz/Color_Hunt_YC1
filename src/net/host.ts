@@ -3,6 +3,7 @@ import type { RGB } from '../types/color';
 import type { GameSettings, Player, Round, RoundResult } from '../types/game';
 import { getDynamicTargetColor, getRandomTargetColor } from '../data/targetColors';
 import { seededRng } from '../utils/challenge';
+import { pickTheme } from '../data/themes';
 import { finalizeResults, type Ballots, type Vote } from '../utils/voting';
 
 export type Phase = 'lobby' | 'playing' | 'voting' | 'leaderboard' | 'final';
@@ -54,7 +55,9 @@ const validRgb = (c: RGB | null): c is RGB => !!c && validByte(c.r) && validByte
 function newRound(state: OnlineState, pick: PickTarget): Round {
   const prev = state.rounds[state.rounds.length - 1];
   const roundNumber = state.rounds.length + 1;
-  return { roundNumber, targetColor: pick(state.settings!, prev?.targetColor.id, roundNumber), results: [], currentPlayerIndex: 0 };
+  const settings = state.settings!;
+  const theme = settings.themes ? pickTheme(settings.seed ? seededRng(settings.seed, roundNumber + 1000) : undefined) : undefined;
+  return { roundNumber, targetColor: pick(settings, prev?.targetColor.id, roundNumber), results: [], currentPlayerIndex: 0, ...(theme && { theme }) };
 }
 
 function scoreResult(playerId: string, rgb: RGB | null, target: RGB): RoundResult {
@@ -101,7 +104,7 @@ export function hostReduce(state: OnlineState, from: string, intent: Intent, pic
     case 'START': {
       if (!isHost || state.phase !== 'lobby') return state;
       const s = intent.settings;
-      const settings: GameSettings = { roundCount: Math.min(Math.max(Math.floor(s.roundCount) || 3, 1), 10), difficulty: s.difficulty, useRandomColor: !!s.useRandomColor, memoryMode: !!s.memoryMode, seed: typeof s.seed === "string" && /^[a-z0-9]{1,12}$/i.test(s.seed) ? s.seed : undefined };
+      const settings: GameSettings = { roundCount: Math.min(Math.max(Math.floor(s.roundCount) || 3, 1), 10), difficulty: s.difficulty, useRandomColor: !!s.useRandomColor, memoryMode: !!s.memoryMode, themes: !!s.themes, seed: typeof s.seed === "string" && /^[a-z0-9]{1,12}$/i.test(s.seed) ? s.seed : undefined };
       const next = { ...state, settings, rounds: [] as Round[], ballots: {}, phase: 'playing' as Phase };
       return { ...next, rounds: [newRound(next, pick)] };
     }

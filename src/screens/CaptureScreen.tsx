@@ -16,6 +16,7 @@ const TURN_SECONDS = 45;
 export interface OnlineCapture {
   targetColor: TargetColor;
   roundNumber: number;
+  theme?: string;
   playerName: string;
   memoryMode: boolean;
   onSubmit: (extractedRgb: RGB | null) => void;
@@ -28,7 +29,7 @@ interface CaptureScreenProps {
 
 export function CaptureScreen({ onRoundResultReady, online }: CaptureScreenProps) {
   const { state, currentRound: localRound, recordResult } = useGameState();
-  const currentRound = useMemo(() => (online ? { targetColor: online.targetColor, roundNumber: online.roundNumber, currentPlayerIndex: 0 } : localRound), [online, localRound]);
+  const currentRound = useMemo(() => (online ? { targetColor: online.targetColor, roundNumber: online.roundNumber, theme: online.theme, currentPlayerIndex: 0 } : localRound), [online, localRound]);
   const videoElRef = useRef<HTMLVideoElement | null>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const [capturedPhoto, setCapturedPhoto] = useState<CapturedPhoto | null>(null);
@@ -173,7 +174,7 @@ export function CaptureScreen({ onRoundResultReady, online }: CaptureScreenProps
         />
       ) : (
         <div className="relative flex-1 bg-black">
-          <TargetColorBanner targetColor={currentRound.targetColor} roundNumber={currentRound.roundNumber} hideSwatchAfterMs={(online ? online.memoryMode : state.settings?.memoryMode) ? 4000 : undefined} />
+          <TargetColorBanner targetColor={currentRound.targetColor} roundNumber={currentRound.roundNumber} theme={currentRound.theme} hideSwatchAfterMs={(online ? online.memoryMode : state.settings?.memoryMode) ? 4000 : undefined} />
           <div className="absolute top-24 inset-x-0 z-10 flex justify-center">
             <div className="bg-black/50 px-4 py-2 rounded-full backdrop-blur-md flex items-center gap-4">
               <span className="text-white font-medium">{player?.name}'s Turn</span>

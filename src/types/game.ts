@@ -34,6 +34,8 @@ export interface GameSettings {
   memoryMode: boolean;
   /** Challenge links: same seed gives the same target colours for everyone. */
   seed?: string;
+  /** Each round also shows a hunting-ground prompt such as "Find it in the kitchen". */
+  themes?: boolean;
 }
 
 /**
@@ -61,6 +63,7 @@ export interface Round {
   targetColor: TargetColor;
   results: RoundResult[];
   currentPlayerIndex: number;
+  theme?: string;
 }
 
 export interface GameState {

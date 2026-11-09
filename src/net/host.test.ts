@@ -20,6 +20,13 @@ describe('host reducer', () => {
     expect(s.players).toHaveLength(4);
   });
 
+  it('gives each round a theme only when themes are on, and the same one for the same seed', () => {
+    const start = (settings: object) => run(lobby(), ['h', { type: 'START', settings: { ...SETTINGS, ...settings } }]).rounds[0].theme;
+    expect(start({})).toBeUndefined();
+    expect(start({ themes: true, seed: 'abc' })).toBeTruthy();
+    expect(start({ themes: true, seed: 'abc' })).toBe(start({ themes: true, seed: 'abc' }));
+  });
+
   it('only the host can start', () => {
     expect(run(lobby(), ['a', { type: 'START', settings: { ...SETTINGS } }]).phase).toBe('lobby');
     expect(playing().phase).toBe('playing');

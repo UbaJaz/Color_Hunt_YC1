@@ -31,6 +31,7 @@ export function parseChallenge(search: string): GameSettings | null {
     difficulty: DIFFICULTIES.includes(diff) ? diff : 'medium',
     useRandomColor: q.get('random') === '1',
     memoryMode: q.get('memory') === '1',
+    themes: q.get('themes') === '1',
   };
 }
 
@@ -38,6 +39,7 @@ export function buildChallengeUrl(base: string, s: GameSettings & { seed: string
   const q = new URLSearchParams({ seed: s.seed, rounds: String(s.roundCount), diff: s.difficulty });
   if (s.useRandomColor) q.set('random', '1');
   if (s.memoryMode) q.set('memory', '1');
+  if (s.themes) q.set('themes', '1');
   return `${base}?${q}`;
 }
 

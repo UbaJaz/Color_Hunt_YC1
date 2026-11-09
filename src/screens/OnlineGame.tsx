@@ -207,10 +207,10 @@ function RoomView({ session, onLeave, room: { state, send, notFound } }: { sessi
   );
 
   if (state.phase === 'lobby') {
-    const toggle = (label: string, key: 'memoryMode' | 'useRandomColor') => (
+    const toggle = (label: string, key: 'memoryMode' | 'useRandomColor' | 'themes') => (
       <label className="flex items-center justify-between rounded-lg bg-white/5 px-4 py-3 text-sm">
         {label}
-        <input type="checkbox" checked={settings[key]} onChange={e => setSettings({ ...settings, [key]: e.target.checked })} />
+        <input type="checkbox" checked={!!settings[key]} onChange={e => setSettings({ ...settings, [key]: e.target.checked })} />
       </label>
     );
     return (
@@ -230,6 +230,7 @@ function RoomView({ session, onLeave, room: { state, send, notFound } }: { sessi
               </div>
               {toggle('Random colours', 'useRandomColor')}
               {toggle('Memory mode', 'memoryMode')}
+              {toggle('Theme prompts', 'themes')}
             </div>
             <button onClick={() => send({ type: 'START', settings })} className={primary}>Start game</button>
           </>
@@ -284,6 +285,7 @@ function RoomView({ session, onLeave, room: { state, send, notFound } }: { sessi
         online={{
           targetColor: round.targetColor,
           roundNumber: round.roundNumber,
+          theme: round.theme,
           playerName: nameOf(me),
           memoryMode: !!state.settings?.memoryMode,
           onSubmit: rgb => (rgb ? setPending({ round: round.roundNumber, rgb }) : send({ type: 'SUBMIT', extractedRgb: null })),

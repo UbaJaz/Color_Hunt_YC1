@@ -5,6 +5,8 @@ import type { TargetColor } from '../../types/color';
 interface TargetColorBannerProps {
   targetColor: TargetColor;
   roundNumber: number;
+  /** Optional hunting-ground prompt for this round. */
+  theme?: string;
   /** Memory mode: hide the swatch after this many ms. */
   hideSwatchAfterMs?: number;
 }
@@ -18,7 +20,7 @@ const DIFFICULTY_BADGE: Record<string, string> = {
 /** Shows the color the player needs to find, overlaid on the camera view.
  *  Day 6b: includes a difficulty badge so players immediately know how hard
  *  the round is before they start hunting. */
-export function TargetColorBanner({ targetColor, roundNumber, hideSwatchAfterMs }: TargetColorBannerProps) {
+export function TargetColorBanner({ targetColor, roundNumber, theme, hideSwatchAfterMs }: TargetColorBannerProps) {
   const [hidden, setHidden] = useState(false);
   useEffect(() => {
     if (!hideSwatchAfterMs) return;
@@ -38,6 +40,7 @@ export function TargetColorBanner({ targetColor, roundNumber, hideSwatchAfterMs 
           )}
         </div>
         <p className="text-lg font-semibold text-white">{targetColor.name}</p>
+        {theme && <p className="text-xs text-yellow-300">{theme}</p>}
       </div>
       {hidden ? (
         <p className="text-xs text-neutral-400">Remember it!</p>

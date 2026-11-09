@@ -29,13 +29,14 @@ export function LobbyScreen({ onStartGame, onPlayOnline }: LobbyScreenProps) {
   const [difficulty, setDifficulty] = useState<Difficulty>(challenge?.difficulty ?? 'medium');
   const [useRandomColor, setUseRandomColor] = useState(challenge?.useRandomColor ?? false);
   const [memoryMode, setMemoryMode] = useState(challenge?.memoryMode ?? false);
+  const [themes, setThemes] = useState(challenge?.themes ?? false);
   const [seed, setSeed] = useState(challenge?.seed);
   const [copied, setCopied] = useState(false);
 
   const copyChallenge = () => {
     const s = seed ?? makeSeed();
     setSeed(s);
-    void navigator.clipboard?.writeText(buildChallengeUrl(window.location.origin + window.location.pathname, { seed: s, roundCount, difficulty, useRandomColor, memoryMode }));
+    void navigator.clipboard?.writeText(buildChallengeUrl(window.location.origin + window.location.pathname, { seed: s, roundCount, difficulty, useRandomColor, memoryMode, themes }));
     setCopied(true);
   };
 
@@ -51,7 +52,7 @@ export function LobbyScreen({ onStartGame, onPlayOnline }: LobbyScreenProps) {
 
   const handleStart = () => {
     if (state.players.length === 0) return;
-    onStartGame({ roundCount, difficulty, useRandomColor, memoryMode, seed });
+    onStartGame({ roundCount, difficulty, useRandomColor, memoryMode, themes, seed });
   };
 
   const today = dailySeed();
@@ -152,6 +153,21 @@ export function LobbyScreen({ onStartGame, onPlayOnline }: LobbyScreenProps) {
                 memoryMode ? 'translate-x-5' : 'translate-x-0'
               }`}
             />
+          </button>
+        </div>
+
+        {/* Theme prompts */}
+        <div className="mb-5 flex items-center justify-between rounded-lg bg-white/5 px-4 py-3">
+          <div>
+            <p className="text-sm font-medium">Theme Prompts</p>
+            <p className="text-xs text-neutral-400">Each round says where to hunt</p>
+          </div>
+          <button
+            onClick={() => setThemes(v => !v)}
+            aria-label="Theme prompts"
+            className={`relative h-6 w-11 rounded-full transition-colors ${themes ? 'bg-pink-600' : 'bg-neutral-700'}`}
+          >
+            <span className={`absolute top-0.5 left-0.5 h-5 w-5 rounded-full bg-white transition-transform ${themes ? 'translate-x-5' : 'translate-x-0'}`} />
           </button>
         </div>
 
