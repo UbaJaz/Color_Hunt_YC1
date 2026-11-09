@@ -95,7 +95,7 @@ export function recomputeTotals(players: Player[], rounds: Round[]): Player[] {
 function finishVoting(state: OnlineState): OnlineState {
   const rounds = state.rounds.slice();
   const last = rounds[rounds.length - 1];
-  rounds[rounds.length - 1] = { ...last, results: finalizeResults(last.results, state.ballots) };
+  rounds[rounds.length - 1] = { ...last, results: finalizeResults(last.results, state.ballots, state.rounds.slice(0, -1).map(r => r.results)) };
   return { ...state, rounds, players: recomputeTotals(state.players, rounds), phase: 'leaderboard' };
 }
 

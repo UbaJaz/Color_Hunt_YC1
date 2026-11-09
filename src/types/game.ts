@@ -60,6 +60,8 @@ export interface RoundResult {
   confidence: ConfidenceResult | null;
   bonusVotes: { thumbsUp: number; thumbsDown: number } | null;
   finalScore: number | null;
+  /** Consecutive rounds (this one included) with a colour score of at least 80. */
+  streak?: number;
   debugData?: ExtractionDebugData | null;
 }
 

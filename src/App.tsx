@@ -83,7 +83,7 @@ function AppShell() {
     } else {
       // Everyone has played. Voting needs someone besides the owner, so solo play skips it.
       if (state.players.length < 2 && currentRound) {
-        recordVotes(finalizeResults(currentRound.results, {}));
+        recordVotes(finalizeResults(currentRound.results, {}, state.rounds.slice(0, -1).map(r => r.results)));
         setScreen('leaderboard');
       } else {
         setScreen('voting');

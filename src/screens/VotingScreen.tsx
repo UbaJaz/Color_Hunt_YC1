@@ -36,7 +36,7 @@ export function VotingScreen({ onVotingComplete }: { onVotingComplete: () => voi
       setReady(false);
       return;
     }
-    recordVotes(finalizeResults(currentRound.results, ballots));
+    recordVotes(finalizeResults(currentRound.results, ballots, state.rounds.slice(0, -1).map(r => r.results)));
     onVotingComplete();
   };
 
