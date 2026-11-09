@@ -101,7 +101,7 @@ export function hostReduce(state: OnlineState, from: string, intent: Intent, pic
     case 'START': {
       if (!isHost || state.phase !== 'lobby') return state;
       const s = intent.settings;
-      const settings: GameSettings = { roundCount: Math.min(Math.max(Math.floor(s.roundCount) || 3, 1), 10), difficulty: s.difficulty, useRandomColor: !!s.useRandomColor, memoryMode: !!s.memoryMode };
+      const settings: GameSettings = { roundCount: Math.min(Math.max(Math.floor(s.roundCount) || 3, 1), 10), difficulty: s.difficulty, useRandomColor: !!s.useRandomColor, memoryMode: !!s.memoryMode, seed: typeof s.seed === "string" && /^[a-z0-9]{1,12}$/i.test(s.seed) ? s.seed : undefined };
       const next = { ...state, settings, rounds: [] as Round[], ballots: {}, phase: 'playing' as Phase };
       return { ...next, rounds: [newRound(next, pick)] };
     }

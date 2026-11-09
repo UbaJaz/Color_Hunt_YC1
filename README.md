@@ -1,6 +1,6 @@
 # ColorHunt
 
-ColorHunt is a real-time color-matching game for groups of friends playing on a single device (pass-and-play). Players take turns pointing their phone camera at a real-world object and trying to match a randomly chosen target color. The game scores each attempt using perceptually accurate color science (CIELAB + CIEDE2000), assigns rarity tiers to extracted colors, and tracks results across rounds.
+ColorHunt is a real-time color-matching game for groups of friends playing either on a single device (pass-and-play) or online, each on their own phone with a room code (see Online multiplayer below). Challenge links (Copy challenge link in the lobby) give everyone the same colours, and the final screen can share a results image. Players take turns pointing their phone camera at a real-world object and trying to match a randomly chosen target color. The game scores each attempt using perceptually accurate color science (CIELAB + CIEDE2000), assigns rarity tiers to extracted colors, and tracks results across rounds.
 
 ---
 
@@ -141,4 +141,4 @@ MIT, see [LICENSE](LICENSE).
 
 ## Online multiplayer
 
-Create or join a room from the lobby ("Play online with friends"). Rooms use Supabase Realtime broadcast (no tables); the host device is authoritative and recomputes scores. Copy `.env.example` to `.env` and fill in `VITE_SUPABASE_URL` and `VITE_SUPABASE_ANON_KEY`.
+Create or join a room from the lobby ("Play online with friends"). Rooms use Supabase Realtime broadcast (no tables); the host device is authoritative and recomputes scores. Online play is optional. Create a free Supabase project (no tables or migrations needed, Realtime broadcast only), copy `.env.example` to `.env` and fill in `VITE_SUPABASE_URL` and `VITE_SUPABASE_ANON_KEY`.
