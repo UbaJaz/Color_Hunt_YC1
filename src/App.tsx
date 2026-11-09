@@ -8,6 +8,7 @@ import { LeaderboardScreen } from './screens/LeaderboardScreen';
 import { GameStateProvider, useGameState } from './state/GameStateContext';
 import type { GameSettings } from './types/game';
 import { finalizeResults } from './utils/voting';
+import { shareResults } from './utils/shareCard';
 import { clearSave, loadSave, writeSave } from './utils/save';
 import { OnlineGame, loadOnlineSession } from './screens/OnlineGame';
 
@@ -156,6 +157,9 @@ function AppShell() {
               </div>
             ))}
           </div>
+          <button onClick={() => void shareResults(sortedForFinal, state.settings?.roundCount ?? 0)} className="text-sm text-neutral-300 underline">
+            Share results
+          </button>
           <button
             onClick={() => { resetGame(); setScreen('lobby'); }}
             className="rounded-full bg-white px-8 py-3 font-bold text-black shadow-lg transition-transform active:scale-95"

@@ -10,6 +10,7 @@ import { makeRoomCode, onlineConfigured, openRoom, type RoomConn } from '../net/
 import type { RGB } from '../types/color';
 import type { GameSettings } from '../types/game';
 import type { Vote } from '../utils/voting';
+import { shareResults } from '../utils/shareCard';
 
 /** Per-tab (sessionStorage) so two tabs are two players, and a refresh rejoins the same seat. */
 interface Session {
@@ -355,6 +356,7 @@ function RoomView({ session, onLeave, room: { state, send, notFound } }: { sessi
       <p className="text-5xl">🏆</p>
       <h1 className="text-3xl font-bold text-yellow-400">Game Over!</h1>
       <Standings state={state} />
+      <button onClick={() => void shareResults(state.players, state.settings?.roundCount ?? 0)} className="text-sm text-neutral-300 underline">Share results</button>
       {isHost ? <button onClick={() => send({ type: 'AGAIN' })} className={primary}>Play again</button> : <p className="text-neutral-400">Waiting for the host…</p>}
       <button onClick={onLeave} className="text-sm text-neutral-400 underline">Leave</button>
     </div>
