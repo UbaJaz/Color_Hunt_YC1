@@ -19,6 +19,9 @@ export interface ExtractionDebugData {
   confidenceReasons: string[];
 }
 
+export type Pack = 'all' | 'nature' | 'pastel' | 'neon';
+export const PACKS: readonly Pack[] = ['all', 'nature', 'pastel', 'neon'];
+
 /**
  * Host-configurable settings chosen in the Lobby before the game starts.
  * Stored in GameState so all screens can access them without prop drilling.
@@ -36,6 +39,8 @@ export interface GameSettings {
   seed?: string;
   /** Each round also shows a hunting-ground prompt such as "Find it in the kitchen". */
   themes?: boolean;
+  /** Which curated colour list the preset rounds draw from (ignored in random-colour mode). */
+  pack?: Pack;
 }
 
 /**

@@ -1,5 +1,5 @@
 import type { Difficulty } from '../types/color';
-import type { GameSettings } from '../types/game';
+import { PACKS, type GameSettings, type Pack } from '../types/game';
 
 /** Small deterministic PRNG (mulberry32) keyed by a string, so the same seed gives the same colours everywhere. */
 export function seededRng(seed: string, salt: number): () => number {
@@ -32,6 +32,7 @@ export function parseChallenge(search: string): GameSettings | null {
     useRandomColor: q.get('random') === '1',
     memoryMode: q.get('memory') === '1',
     themes: q.get('themes') === '1',
+    pack: PACKS.includes(q.get('pack') as Pack) ? (q.get('pack') as Pack) : 'all',
   };
 }
 
@@ -40,6 +41,7 @@ export function buildChallengeUrl(base: string, s: GameSettings & { seed: string
   if (s.useRandomColor) q.set('random', '1');
   if (s.memoryMode) q.set('memory', '1');
   if (s.themes) q.set('themes', '1');
+  if (s.pack && s.pack !== 'all') q.set('pack', s.pack);
   return `${base}?${q}`;
 }
 

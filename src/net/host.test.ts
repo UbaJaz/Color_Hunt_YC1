@@ -27,6 +27,13 @@ describe('host reducer', () => {
     expect(start({ themes: true, seed: 'abc' })).toBe(start({ themes: true, seed: 'abc' }));
   });
 
+  it('draws preset colours from the chosen pack and falls back to all for unknown packs', () => {
+    const start = (pack: unknown) => hostReduce(lobby(), 'h', { type: 'START', settings: { ...SETTINGS, pack } as never }).rounds[0].targetColor.id;
+    const neon = ['neon-green', 'electric-blue', 'hot-magenta', 'laser-lemon', 'blaze-orange', 'electric-purple'];
+    for (let i = 0; i < 20; i++) expect(neon).toContain(start('neon'));
+    expect(start('bogus')).toBeTruthy();
+  });
+
   it('only the host can start', () => {
     expect(run(lobby(), ['a', { type: 'START', settings: { ...SETTINGS } }]).phase).toBe('lobby');
     expect(playing().phase).toBe('playing');

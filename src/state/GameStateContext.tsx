@@ -28,7 +28,7 @@ function pickTargetColor(settings: GameSettings | null, excludeColorId?: string,
   if (settings?.useRandomColor) {
     return getDynamicTargetColor(settings.difficulty, rng);
   }
-  return getRandomTargetColor(excludeColorId, rng);
+  return getRandomTargetColor(excludeColorId, rng, settings?.pack);
 }
 
 function createRound(roundNumber: number, settings: GameSettings | null, excludeColorId?: string): Round {

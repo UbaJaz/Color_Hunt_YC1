@@ -9,7 +9,7 @@ import { newIdentity, signIntent, signState, verifyIntent, verifyState, type Aut
 import { createRoom, hostReduce, type Intent, type OnlineState } from '../net/host';
 import { makeRoomCode, onlineConfigured, openRoom, type RoomConn } from '../net/room';
 import type { RGB } from '../types/color';
-import type { GameSettings } from '../types/game';
+import { PACKS, type GameSettings } from '../types/game';
 import type { Vote } from '../utils/voting';
 import { shareResults } from '../utils/shareCard';
 
@@ -231,6 +231,11 @@ function RoomView({ session, onLeave, room: { state, send, notFound } }: { sessi
               {toggle('Random colours', 'useRandomColor')}
               {toggle('Memory mode', 'memoryMode')}
               {toggle('Theme prompts', 'themes')}
+              <div className="flex gap-2">
+                {PACKS.map(p => (
+                  <button key={p} onClick={() => setSettings({ ...settings, pack: p })} className={`flex-1 rounded-lg py-2 text-xs font-semibold capitalize ${(settings.pack ?? 'all') === p ? 'bg-pink-600' : 'bg-white/10'}`}>{p}</button>
+                ))}
+              </div>
             </div>
             <button onClick={() => send({ type: 'START', settings })} className={primary}>Start game</button>
           </>

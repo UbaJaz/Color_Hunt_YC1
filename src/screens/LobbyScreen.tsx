@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { useGameState } from '../state/GameStateContext';
-import type { GameSettings } from '../types/game';
+import { PACKS, type GameSettings, type Pack } from '../types/game';
 import type { Difficulty } from '../types/color';
 import { buildChallengeUrl, dailySeed, makeSeed, parseChallenge } from '../utils/challenge';
 import { loadStats } from '../utils/stats';
@@ -30,13 +30,14 @@ export function LobbyScreen({ onStartGame, onPlayOnline }: LobbyScreenProps) {
   const [useRandomColor, setUseRandomColor] = useState(challenge?.useRandomColor ?? false);
   const [memoryMode, setMemoryMode] = useState(challenge?.memoryMode ?? false);
   const [themes, setThemes] = useState(challenge?.themes ?? false);
+  const [pack, setPack] = useState<Pack>(challenge?.pack ?? 'all');
   const [seed, setSeed] = useState(challenge?.seed);
   const [copied, setCopied] = useState(false);
 
   const copyChallenge = () => {
     const s = seed ?? makeSeed();
     setSeed(s);
-    void navigator.clipboard?.writeText(buildChallengeUrl(window.location.origin + window.location.pathname, { seed: s, roundCount, difficulty, useRandomColor, memoryMode, themes }));
+    void navigator.clipboard?.writeText(buildChallengeUrl(window.location.origin + window.location.pathname, { seed: s, roundCount, difficulty, useRandomColor, memoryMode, themes, pack }));
     setCopied(true);
   };
 
@@ -52,7 +53,7 @@ export function LobbyScreen({ onStartGame, onPlayOnline }: LobbyScreenProps) {
 
   const handleStart = () => {
     if (state.players.length === 0) return;
-    onStartGame({ roundCount, difficulty, useRandomColor, memoryMode, themes, seed });
+    onStartGame({ roundCount, difficulty, useRandomColor, memoryMode, themes, pack, seed });
   };
 
   const today = dailySeed();
@@ -154,6 +155,24 @@ export function LobbyScreen({ onStartGame, onPlayOnline }: LobbyScreenProps) {
               }`}
             />
           </button>
+        </div>
+
+        {/* Colour pack */}
+        <div className="mb-5">
+          <p className="text-sm text-neutral-400 mb-2">
+            Colour pack{useRandomColor && <span className="ml-1 text-xs opacity-50">(not used in Random mode)</span>}
+          </p>
+          <div className="flex gap-2">
+            {PACKS.map(p => (
+              <button
+                key={p}
+                onClick={() => setPack(p)}
+                className={`flex-1 rounded-lg py-2 text-xs font-semibold capitalize ${pack === p ? 'bg-pink-600 text-white' : 'bg-white/10 text-neutral-300'}`}
+              >
+                {p}
+              </button>
+            ))}
+          </div>
         </div>
 
         {/* Theme prompts */}

@@ -1,5 +1,6 @@
 import type { RGB, TargetColor, Difficulty } from '../types/color';
 import { generateRandomTargetColor } from '@color-science';
+import type { Pack } from '../types/game';
 
 function hexToRgb(hex: string): RGB {
   const normalized = hex.replace('#', '');
@@ -41,9 +42,37 @@ export const TARGET_COLORS: readonly TargetColor[] = [
   defineColor('slate-gray', 'Slate Gray', '#708090', 'hard'),
 ];
 
-/** Picks a random color from the curated preset list, optionally excluding the last one. */
-export function getRandomTargetColor(excludeId?: string, rng: () => number = Math.random): TargetColor {
-  const pool = excludeId ? TARGET_COLORS.filter((c) => c.id !== excludeId) : TARGET_COLORS;
+const NATURE: TargetColor[] = [
+  ...['forest-green', 'sea-green', 'olive', 'chocolate', 'sandy-brown', 'cadet-blue', 'steel-blue', 'goldenrod', 'slate-gray'].map(id => TARGET_COLORS.find(c => c.id === id)!),
+  defineColor('moss', 'Moss', '#6B7F3A', 'medium'),
+  defineColor('terracotta', 'Terracotta', '#C9694A', 'medium'),
+  defineColor('sky', 'Sky', '#87CEEB', 'easy'),
+  defineColor('sand', 'Sand', '#D8C28F', 'medium'),
+];
+const PASTEL: TargetColor[] = [
+  defineColor('baby-pink', 'Baby Pink', '#F8C8DC', 'medium'),
+  defineColor('mint', 'Mint', '#BDEFD0', 'medium'),
+  defineColor('lavender', 'Lavender', '#D6C8F0', 'medium'),
+  defineColor('peach', 'Peach', '#FFD3B0', 'medium'),
+  defineColor('powder-blue', 'Powder Blue', '#B7D7F0', 'medium'),
+  defineColor('butter', 'Butter', '#FFF2B3', 'medium'),
+];
+const NEON: TargetColor[] = [
+  defineColor('neon-green', 'Neon Green', '#39FF14', 'easy'),
+  defineColor('electric-blue', 'Electric Blue', '#00B7FF', 'easy'),
+  defineColor('hot-magenta', 'Hot Magenta', '#FF1493', 'easy'),
+  defineColor('laser-lemon', 'Laser Lemon', '#FFFF33', 'easy'),
+  defineColor('blaze-orange', 'Blaze Orange', '#FF5F1F', 'easy'),
+  defineColor('electric-purple', 'Electric Purple', '#BF00FF', 'easy'),
+];
+
+/** 'all' stays the original list so existing challenge links keep producing the same colours. */
+export const COLOR_PACKS: Record<Pack, readonly TargetColor[]> = { all: TARGET_COLORS, nature: NATURE, pastel: PASTEL, neon: NEON };
+
+/** Picks a random color from a curated preset list, optionally excluding the last one. */
+export function getRandomTargetColor(excludeId?: string, rng: () => number = Math.random, pack: Pack = 'all'): TargetColor {
+  const all = COLOR_PACKS[pack] ?? TARGET_COLORS;
+  const pool = excludeId ? all.filter((c) => c.id !== excludeId) : all;
   const index = Math.floor(rng() * pool.length);
   return pool[index];
 }

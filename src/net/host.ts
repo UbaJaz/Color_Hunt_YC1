@@ -1,6 +1,6 @@
 import { deltaE2000, deltaEToMatchScore, rgbToLab } from '@color-science';
 import type { RGB } from '../types/color';
-import type { GameSettings, Player, Round, RoundResult } from '../types/game';
+import { PACKS, type GameSettings, type Pack, type Player, type Round, type RoundResult } from '../types/game';
 import { getDynamicTargetColor, getRandomTargetColor } from '../data/targetColors';
 import { seededRng } from '../utils/challenge';
 import { pickTheme } from '../data/themes';
@@ -46,7 +46,7 @@ export function createRoom(code: string, hostId: string, hostName: string): Onli
 export type PickTarget = (settings: GameSettings, excludeId: string | undefined, roundNumber: number) => Round['targetColor'];
 const defaultPick: PickTarget = (s, ex, n) => {
   const rng = s.seed ? seededRng(s.seed, n) : undefined;
-  return s.useRandomColor ? getDynamicTargetColor(s.difficulty, rng) : getRandomTargetColor(ex, rng);
+  return s.useRandomColor ? getDynamicTargetColor(s.difficulty, rng) : getRandomTargetColor(ex, rng, s.pack);
 };
 
 const validByte = (n: unknown) => typeof n === 'number' && Number.isFinite(n) && n >= 0 && n <= 255;
@@ -104,7 +104,7 @@ export function hostReduce(state: OnlineState, from: string, intent: Intent, pic
     case 'START': {
       if (!isHost || state.phase !== 'lobby') return state;
       const s = intent.settings;
-      const settings: GameSettings = { roundCount: Math.min(Math.max(Math.floor(s.roundCount) || 3, 1), 10), difficulty: s.difficulty, useRandomColor: !!s.useRandomColor, memoryMode: !!s.memoryMode, themes: !!s.themes, seed: typeof s.seed === "string" && /^[a-z0-9]{1,12}$/i.test(s.seed) ? s.seed : undefined };
+      const settings: GameSettings = { roundCount: Math.min(Math.max(Math.floor(s.roundCount) || 3, 1), 10), difficulty: s.difficulty, useRandomColor: !!s.useRandomColor, memoryMode: !!s.memoryMode, themes: !!s.themes, pack: PACKS.includes(s.pack as Pack) ? s.pack : 'all', seed: typeof s.seed === "string" && /^[a-z0-9]{1,12}$/i.test(s.seed) ? s.seed : undefined };
       const next = { ...state, settings, rounds: [] as Round[], ballots: {}, phase: 'playing' as Phase };
       return { ...next, rounds: [newRound(next, pick)] };
     }

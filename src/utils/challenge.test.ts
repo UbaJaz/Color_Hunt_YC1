@@ -17,7 +17,7 @@ describe('seededRng', () => {
 });
 
 describe('challenge links', () => {
-  const settings = { seed: 'k3j9x2', roundCount: 5, difficulty: 'hard', useRandomColor: true, memoryMode: true, themes: true } as const;
+  const settings = { seed: 'k3j9x2', roundCount: 5, difficulty: 'hard', useRandomColor: true, memoryMode: true, themes: true, pack: 'neon' } as const;
 
   it('round-trips settings through a link', () => {
     const url = new URL(buildChallengeUrl('https://x.test/', settings));
