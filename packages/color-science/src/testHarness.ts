@@ -444,7 +444,11 @@ function testCalibration() {
   console.log(`  ${cardTest ? 'PASS' : 'FAIL'}: white accepted, red/dark rejected`);
   const scoreTest = deltaEToMatchScore(0) === 100 && deltaEToMatchScore(15) === 50 && deltaEToMatchScore(60) < 10;
   console.log(`  ${scoreTest ? 'PASS' : 'FAIL'}: match score 0->100, 15->50, 60->single digits`);
-  if (!(dimTest && cardTest && scoreTest)) process.exitCode = 1;
+  const castCard = { r: 200, g: 170, b: 130 };
+  const fixed = applyCalibration(castCard, estimateWhiteBalance(castCard));
+  const castTest = fixed.r === fixed.g && fixed.g === fixed.b;
+  console.log(`  ${castTest ? 'PASS' : 'FAIL'}: the card itself becomes neutral after correction`);
+  if (!(dimTest && cardTest && scoreTest && castTest)) process.exitCode = 1;
 
   console.log('\n' + '-'.repeat(80));
 }

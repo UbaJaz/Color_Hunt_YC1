@@ -8,7 +8,7 @@ import { RGB, Lab, XYZ } from './types.js';
  * sRGB to linear RGB conversion
  * Applies gamma correction (inverse companding)
  */
-function srgbToLinear(rgb: number): number {
+export function srgbToLinear(rgb: number): number {
   const normalized = rgb / 255;
   if (normalized <= 0.04045) {
     return normalized / 12.92;
@@ -135,7 +135,7 @@ function fInverse(t: number): number {
  * Linear RGB to sRGB conversion
  * Applies gamma correction (companding)
  */
-function linearToSrgb(linear: number): number {
+export function linearToSrgb(linear: number): number {
   if (linear <= 0.0031308) {
     return 12.92 * linear;
   } else {
