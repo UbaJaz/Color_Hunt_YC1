@@ -1,11 +1,6 @@
 import { useGameState } from '../state/GameStateContext';
-import { ColorSwatch } from '../components/ui/ColorSwatch';
-import type { RGB } from '../types/color';
+import { RoundReveal } from '../components/ui/RoundReveal';
 
-function rgbToHex({ r, g, b }: RGB): string {
-  const toHex = (n: number) => n.toString(16).padStart(2, '0');
-  return `#${toHex(r)}${toHex(g)}${toHex(b)}`.toUpperCase();
-}
 
 export function LeaderboardScreen({ onNextRound }: { onNextRound: () => void }) {
   const { state, currentRound } = useGameState();
@@ -22,35 +17,9 @@ export function LeaderboardScreen({ onNextRound }: { onNextRound: () => void }) 
       </h1>
 
       <div className="w-full max-w-sm flex flex-col gap-8">
-        <div>
-          <h2 className="text-sm uppercase tracking-wider text-neutral-400 mb-4 text-center">Round {currentRound.roundNumber} Results</h2>
-          <div className="flex flex-col gap-3">
-            {[...currentRound.results].sort((a,b) => (b.finalScore || 0) - (a.finalScore || 0)).map(result => {
-              const player = state.players.find(p => p.id === result.playerId);
-              if (!player) return null;
-              
-              return (
-                <div key={result.playerId} className="flex items-center justify-between bg-white/5 rounded-xl p-3">
-                  <div className="flex items-center gap-3">
-                    {result.extractedRgb ? (
-                      <div className="scale-75 origin-left">
-                        <ColorSwatch hex={rgbToHex(result.extractedRgb)} label="" />
-                      </div>
-                    ) : (
-                      <div className="w-10 h-10 rounded-lg bg-neutral-800" />
-                    )}
-                    <span className="font-medium">{player.name}</span>
-                  </div>
-                  <div className="flex flex-col items-end">
-                    <span className="font-bold text-lg text-pink-400">{result.finalScore}</span>
-                    {result.bonusVotes && (result.bonusVotes.thumbsUp > result.bonusVotes.thumbsDown) && (
-                      <span className="text-[10px] text-green-400 font-bold uppercase tracking-wide">Vote bonus +{(result.finalScore ?? 0) - Math.round(result.score ?? 0)}</span>
-                    )}
-                  </div>
-                </div>
-              );
-            })}
-          </div>
+        <div className="flex flex-col items-center gap-3">
+          <h2 className="text-sm uppercase tracking-wider text-neutral-400 text-center">Round {currentRound.roundNumber} Results</h2>
+          <RoundReveal target={currentRound.targetColor} results={currentRound.results} nameOf={id => state.players.find(p => p.id === id)?.name ?? '?'} />
         </div>
 
         <div>

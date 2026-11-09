@@ -1,3 +1,4 @@
+import { RoundReveal } from '../components/ui/RoundReveal';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { deltaE2000, deltaEToMatchScore, rgbToLab } from '@color-science';
 import { useGameState } from '../state/GameStateContext';
@@ -327,17 +328,7 @@ function RoomView({ session, onLeave, room: { state, send, notFound } }: { sessi
     return (
       <div className={shell}>
         <h1 className="text-3xl font-bold text-yellow-400">Round {round.roundNumber} results</h1>
-        <div className="flex w-full max-w-sm flex-col gap-3">
-          {[...round.results].sort((a, b) => (b.finalScore ?? 0) - (a.finalScore ?? 0)).map(r => (
-            <div key={r.playerId} className="flex items-center justify-between rounded-xl bg-white/5 p-3">
-              <span className="flex items-center gap-3">
-                <span className="h-8 w-8 rounded-lg bg-neutral-800" style={r.extractedRgb ? { background: hex(r.extractedRgb) } : undefined} />
-                {nameOf(r.playerId)}
-              </span>
-              <span className="font-bold text-pink-400">{r.finalScore}</span>
-            </div>
-          ))}
-        </div>
+        <RoundReveal target={round.targetColor} results={round.results} nameOf={nameOf} />
         <h2 className="text-sm uppercase tracking-wider text-neutral-400">Total score</h2>
         <Standings state={state} />
         {isHost ? (
