@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
+import { lockWhiteBalance } from '../utils/cameraLock';
 
 export type CameraStatus =
   | 'idle'
@@ -54,6 +55,9 @@ export function useCamera(): UseCameraResult {
         streamRef.current = mediaStream;
         setStream(mediaStream);
         setStatus('granted');
+        // let auto white balance settle on the scene first, then freeze it
+        const track = mediaStream.getVideoTracks()[0];
+        if (track) setTimeout(() => void lockWhiteBalance(track), 1500);
       })
       .catch((err: unknown) => {
         const message = err instanceof Error ? err.message : 'Unknown camera error';
