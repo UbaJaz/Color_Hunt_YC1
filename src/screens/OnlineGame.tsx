@@ -18,6 +18,8 @@ interface Session {
   host: OnlineState | null; // the host's authoritative state, so a host refresh keeps the game
 }
 const KEY = 'colorhunt.online';
+const HEARTBEAT_MS = 5000;
+const HOST_TIMEOUT_MS = 15000;
 export const loadOnlineSession = (): Session | null => {
   try {
     return JSON.parse(sessionStorage.getItem(KEY) ?? 'null');
@@ -34,6 +36,8 @@ const primary = 'rounded-full bg-pink-600 px-8 py-3 font-bold disabled:opacity-5
 function useRoom(session: Session, onSession: (s: Session) => void) {
   const [state, setState] = useState<OnlineState | null>(session.host);
   const [notFound, setNotFound] = useState(false);
+  const [hostGone, setHostGone] = useState(false);
+  const lastSeen = useRef(Date.now());
   const stateRef = useRef(state);
   const conn = useRef<RoomConn | null>(null);
 
@@ -54,6 +58,8 @@ function useRoom(session: Session, onSession: (s: Session) => void) {
       onIntent: (from, intent) => session.isHost && apply(from, intent),
       onState: s => {
         if (session.isHost) return;
+        lastSeen.current = Date.now();
+        setHostGone(false);
         stateRef.current = s;
         setState(s);
       },
@@ -61,6 +67,12 @@ function useRoom(session: Session, onSession: (s: Session) => void) {
     conn.current = c;
     let timer: ReturnType<typeof setInterval> | undefined;
     let tries = 0;
+    // Heartbeat: the host rebroadcasts every 5s; clients that hear nothing for 15s show a banner.
+    const beat = setInterval(() => {
+      if (session.isHost) {
+        if (stateRef.current) c.sendState(stateRef.current);
+      } else if (stateRef.current && Date.now() - lastSeen.current > HOST_TIMEOUT_MS) setHostGone(true);
+    }, HEARTBEAT_MS);
     if (!session.isHost) {
       const hello = () => {
         if (stateRef.current) return clearInterval(timer);
@@ -75,6 +87,7 @@ function useRoom(session: Session, onSession: (s: Session) => void) {
     }
     return () => {
       clearInterval(timer);
+      clearInterval(beat);
       c.close();
       conn.current = null;
     };
@@ -86,7 +99,7 @@ function useRoom(session: Session, onSession: (s: Session) => void) {
     (intent: Intent) => (session.isHost ? apply(session.playerId, intent) : conn.current?.sendIntent(session.playerId, intent)),
     [session, apply]
   );
-  return { state, send, notFound };
+  return { state, send, notFound, hostGone };
 }
 
 function Standings({ state }: { state: OnlineState }) {
@@ -103,7 +116,21 @@ function Standings({ state }: { state: OnlineState }) {
 }
 
 function Room({ session, onSession, onLeave }: { session: Session; onSession: (s: Session) => void; onLeave: () => void }) {
-  const { state, send, notFound } = useRoom(session, onSession);
+  const room = useRoom(session, onSession);
+  return (
+    <div className="relative h-full w-full">
+      {room.hostGone && (
+        <div role="alert" className="absolute inset-x-0 top-0 z-50 bg-red-600 p-2 text-center text-sm font-semibold text-white">
+          Host disconnected. Waiting for them to come back…{' '}
+          <button onClick={onLeave} className="underline">Leave</button>
+        </div>
+      )}
+      <RoomView session={session} onLeave={onLeave} room={room} />
+    </div>
+  );
+}
+
+function RoomView({ session, onLeave, room: { state, send, notFound } }: { session: Session; onLeave: () => void; room: ReturnType<typeof useRoom> }) {
   const { state: local } = useGameState();
   const [calDone, setCalDone] = useState(false);
   const [settings, setSettings] = useState<GameSettings>({ roundCount: 3, difficulty: 'medium', useRandomColor: false, memoryMode: false });
