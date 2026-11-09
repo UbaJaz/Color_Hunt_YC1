@@ -1,5 +1,5 @@
 import { createClient, type RealtimeChannel } from '@supabase/supabase-js';
-import type { Intent, OnlineState } from './host';
+import type { Envelope, StateMsg } from './auth';
 
 const url = import.meta.env.VITE_SUPABASE_URL as string | undefined;
 const key = import.meta.env.VITE_SUPABASE_ANON_KEY as string | undefined;
@@ -15,13 +15,13 @@ export function makeRoomCode(): string {
 }
 
 export interface RoomConn {
-  sendIntent: (from: string, intent: Intent) => void;
-  sendState: (state: OnlineState) => void;
+  sendIntent: (env: Envelope) => void;
+  sendState: (msg: StateMsg) => void;
   close: () => void;
 }
 
 /** Pure message relay on a Supabase Realtime broadcast channel. No tables; the host device holds the truth. */
-export function openRoom(code: string, on: { onIntent: (from: string, intent: Intent) => void; onState: (s: OnlineState) => void }): RoomConn {
+export function openRoom(code: string, on: { onIntent: (env: Envelope) => void; onState: (msg: StateMsg) => void }): RoomConn {
   if (!client) throw new Error('Supabase is not configured');
   const channel: RealtimeChannel = client.channel(`room:${code}`, { config: { broadcast: { self: false } } });
   let live = false;
@@ -32,7 +32,7 @@ export function openRoom(code: string, on: { onIntent: (from: string, intent: In
     else queue.push(go);
   };
   channel
-    .on('broadcast', { event: 'intent' }, ({ payload }) => on.onIntent(payload.from, payload.intent))
+    .on('broadcast', { event: 'intent' }, ({ payload }) => on.onIntent(payload))
     .on('broadcast', { event: 'state' }, ({ payload }) => on.onState(payload))
     .subscribe(status => {
       if (status === 'SUBSCRIBED') {
@@ -41,7 +41,7 @@ export function openRoom(code: string, on: { onIntent: (from: string, intent: In
       }
     });
   return {
-    sendIntent: (from, intent) => send('intent', { from, intent }),
+    sendIntent: env => send('intent', env),
     sendState: state => send('state', state),
     close: () => void client.removeChannel(channel),
   };

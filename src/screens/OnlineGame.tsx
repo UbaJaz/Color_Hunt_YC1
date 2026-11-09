@@ -4,6 +4,7 @@ import { useGameState } from '../state/GameStateContext';
 import { CaptureScreen } from './CaptureScreen';
 import { CalibrationScreen } from './CalibrationScreen';
 import { ColorSwatch } from '../components/ui/ColorSwatch';
+import { newIdentity, signIntent, signState, verifyIntent, verifyState, type AuthRegistry, type Identity } from '../net/auth';
 import { createRoom, hostReduce, type Intent, type OnlineState } from '../net/host';
 import { makeRoomCode, onlineConfigured, openRoom, type RoomConn } from '../net/room';
 import type { RGB } from '../types/color';
@@ -17,6 +18,9 @@ interface Session {
   name: string;
   isHost: boolean;
   host: OnlineState | null; // the host's authoritative state, so a host refresh keeps the game
+  identity: Identity; // signing keypair, so nobody can act as this player
+  hostPub?: JsonWebKey; // client: pinned host key
+  auth?: AuthRegistry; // host: registered player keys and last-seen seq
 }
 const KEY = 'colorhunt.online';
 export const MAX_RETAKES = 3;
@@ -24,7 +28,8 @@ const HEARTBEAT_MS = 5000;
 const HOST_TIMEOUT_MS = 15000;
 export const loadOnlineSession = (): Session | null => {
   try {
-    return JSON.parse(sessionStorage.getItem(KEY) ?? 'null');
+    const s = JSON.parse(sessionStorage.getItem(KEY) ?? 'null');
+    return s?.identity ? s : null; // sessions from before signing was added are dropped
   } catch {
     return null;
   }
@@ -42,6 +47,20 @@ function useRoom(session: Session, onSession: (s: Session) => void) {
   const lastSeen = useRef(Date.now());
   const stateRef = useRef(state);
   const conn = useRef<RoomConn | null>(null);
+  const sess = useRef(session); // latest session, so async callbacks never write back stale auth data
+  const queue = useRef<Promise<unknown>>(Promise.resolve()); // keeps verify/sign work in message order
+  const seq = useRef(0);
+
+  const persist = useCallback((patch: Partial<Session>) => {
+    sess.current = { ...sess.current, ...patch };
+    onSession(sess.current);
+  }, [onSession]);
+
+  const enqueue = useCallback((job: () => Promise<void>) => {
+    queue.current = queue.current.then(job).catch(() => {});
+  }, []);
+
+  const broadcast = useCallback((s: OnlineState) => enqueue(async () => conn.current?.sendState(await signState(sess.current.identity, s))), [enqueue]);
 
   const apply = useCallback(
     (from: string, intent: Intent) => {
@@ -49,22 +68,41 @@ function useRoom(session: Session, onSession: (s: Session) => void) {
       const next = hostReduce(stateRef.current, from, intent);
       stateRef.current = next;
       setState(next);
-      onSession({ ...session, host: next });
-      conn.current?.sendState(next); // also on no-ops: a repeated JOIN is how a refreshed client asks for a snapshot
+      persist({ host: next });
+      broadcast(next); // also on no-ops: a repeated JOIN is how a refreshed client asks for a snapshot
     },
-    [session, onSession]
+    [persist, broadcast]
+  );
+
+  const sendIntent = useCallback(
+    (intent: Intent) => enqueue(async () => {
+      seq.current = Math.max(Date.now(), seq.current + 1); // monotonic across refreshes
+      conn.current?.sendIntent(await signIntent(sess.current.identity, sess.current.playerId, seq.current, intent));
+    }),
+    [enqueue]
   );
 
   useEffect(() => {
     const c = openRoom(session.code, {
-      onIntent: (from, intent) => session.isHost && apply(from, intent),
-      onState: s => {
-        if (session.isHost) return;
-        lastSeen.current = Date.now();
-        setHostGone(false);
-        stateRef.current = s;
-        setState(s);
+      onIntent: env => {
+        if (!session.isHost) return;
+        enqueue(async () => {
+          const reg = sess.current.auth ?? { keys: {}, seqs: {} };
+          const from = await verifyIntent(reg, env);
+          if (!from) return;
+          persist({ auth: reg });
+          apply(from, env.intent);
+        });
       },
+      onState: msg =>
+        enqueue(async () => {
+          if (session.isHost || !(await verifyState(msg, sess.current.hostPub ?? null))) return;
+          if (!sess.current.hostPub) persist({ hostPub: msg.pub });
+          lastSeen.current = Date.now();
+          setHostGone(false);
+          stateRef.current = msg.state;
+          setState(msg.state);
+        }),
     });
     conn.current = c;
     let timer: ReturnType<typeof setInterval> | undefined;
@@ -72,7 +110,7 @@ function useRoom(session: Session, onSession: (s: Session) => void) {
     // Heartbeat: the host rebroadcasts every 5s; clients that hear nothing for 15s show a banner.
     const beat = setInterval(() => {
       if (session.isHost) {
-        if (stateRef.current) c.sendState(stateRef.current);
+        if (stateRef.current) broadcast(stateRef.current);
       } else if (stateRef.current && Date.now() - lastSeen.current > HOST_TIMEOUT_MS) setHostGone(true);
     }, HEARTBEAT_MS);
     if (!session.isHost) {
@@ -82,7 +120,7 @@ function useRoom(session: Session, onSession: (s: Session) => void) {
           setNotFound(true);
           return clearInterval(timer);
         }
-        c.sendIntent(session.playerId, { type: 'JOIN', name: session.name });
+        sendIntent({ type: 'JOIN', name: session.name });
       };
       hello();
       timer = setInterval(hello, 2000);
@@ -98,8 +136,8 @@ function useRoom(session: Session, onSession: (s: Session) => void) {
   }, [session.code]);
 
   const send = useCallback(
-    (intent: Intent) => (session.isHost ? apply(session.playerId, intent) : conn.current?.sendIntent(session.playerId, intent)),
-    [session, apply]
+    (intent: Intent) => (session.isHost ? apply(session.playerId, intent) : sendIntent(intent)),
+    [session.isHost, session.playerId, apply, sendIntent]
   );
   return { state, send, notFound, hostGone };
 }
@@ -340,12 +378,12 @@ export function OnlineGame({ onExit }: { onExit: () => void }) {
   if (session) return <Room session={session} onSession={update} onLeave={leave} />;
 
   const trimmed = name.trim();
-  const create = () => {
+  const create = async () => {
     const playerId = crypto.randomUUID();
     const room = makeRoomCode();
-    update({ code: room, playerId, name: trimmed, isHost: true, host: createRoom(room, playerId, trimmed) });
+    update({ code: room, playerId, name: trimmed, isHost: true, host: createRoom(room, playerId, trimmed), identity: await newIdentity() });
   };
-  const join = () => update({ code: code.trim().toUpperCase(), playerId: crypto.randomUUID(), name: trimmed, isHost: false, host: null });
+  const join = async () => update({ code: code.trim().toUpperCase(), playerId: crypto.randomUUID(), name: trimmed, isHost: false, host: null, identity: await newIdentity() });
 
   return (
     <div className={`${shell} justify-center`}>
