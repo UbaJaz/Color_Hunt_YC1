@@ -180,6 +180,7 @@ function AppShell() {
           {finalStats && (
             <div className="text-center text-xs text-neutral-400">
               {finalStats.newBest && <p className="mb-1 text-sm font-bold text-yellow-300">New personal best!</p>}
+              {isDailySeed(state.settings?.seed) && <p className="mb-1 text-sm font-bold text-orange-300">🔥 {finalStats.stats.dailyStreak} day daily streak</p>}
               <p>
                 Best game {finalStats.stats.bestTotal} · Closest match ΔE {finalStats.stats.bestDeltaE?.toFixed(1) ?? '—'} · {finalStats.stats.gamesPlayed} played
               </p>
