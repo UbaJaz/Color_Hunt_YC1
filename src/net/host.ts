@@ -28,6 +28,8 @@ export interface OnlineState {
   ballots: Ballots;
   /** The last few emoji reactions, newest last. Optional so sessions saved before reactions still load. */
   reactions?: Reaction[];
+  /** Late joiners and overflow: they watch and react but never score. */
+  spectators?: { id: string; name: string }[];
 }
 
 /** What a client may ask for. Scores are never sent: the host derives them from the colour. */
@@ -42,6 +44,7 @@ export type Intent =
   | { type: 'REACT'; emoji: string };
 
 export const MAX_PLAYERS = 8;
+export const MAX_SPECTATORS = 16;
 
 export function createRoom(code: string, hostId: string, hostName: string): OnlineState {
   return {
@@ -53,6 +56,7 @@ export function createRoom(code: string, hostId: string, hostName: string): Onli
     rounds: [],
     ballots: {},
     reactions: [],
+    spectators: [],
   };
 }
 
@@ -110,7 +114,12 @@ export function hostReduce(state: OnlineState, from: string, intent: Intent, pic
   switch (intent.type) {
     case 'JOIN': {
       const name = String(intent.name ?? '').trim().slice(0, 20);
-      if (isPlayer || state.phase !== 'lobby' || !name || state.players.length >= MAX_PLAYERS) return state;
+      const watching = state.spectators ?? [];
+      if (isPlayer || !name || watching.some(w => w.id === from)) return state;
+      if (state.phase !== 'lobby' || state.players.length >= MAX_PLAYERS) {
+        // Too late (or full) to play: watch instead.
+        return watching.length >= MAX_SPECTATORS ? state : { ...state, spectators: [...watching, { id: from, name }] };
+      }
       const taken = state.players.some(p => p.name.toLowerCase() === name.toLowerCase());
       return { ...state, players: [...state.players, { id: from, name: taken ? `${name} 2` : name, totalScore: 0 }] };
     }
@@ -156,7 +165,7 @@ export function hostReduce(state: OnlineState, from: string, intent: Intent, pic
     }
     case 'REACT': {
       // Cosmetic only: a fixed emoji whitelist, nothing the client sends is stored as-is.
-      if (!isPlayer || !(REACTIONS as readonly string[]).includes(intent.emoji)) return state;
+      if (!(isPlayer || state.spectators?.some(w => w.id === from)) || !(REACTIONS as readonly string[]).includes(intent.emoji)) return state;
       const prev = state.reactions ?? [];
       const id = (prev[prev.length - 1]?.id ?? 0) + 1;
       return { ...state, reactions: [...prev, { id, from, emoji: intent.emoji }].slice(-MAX_REACTIONS) };

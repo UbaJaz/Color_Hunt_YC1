@@ -40,9 +40,24 @@ describe('host reducer', () => {
     expect(s.reactions).toEqual([{ id: 1, from: 'a', emoji: '🔥' }]);
     expect(hostReduce(s, 'a', { type: 'REACT', emoji: '<script>' })).toBe(s);
     expect(hostReduce(s, 'stranger', { type: 'REACT', emoji: '🔥' })).toBe(s);
+    const watched = hostReduce(s, 'w', { type: 'JOIN', name: 'Watcher' });
+    expect(hostReduce(watched, 'w', { type: 'REACT', emoji: '👏' }).reactions).toHaveLength(2);
     for (let i = 0; i < 10; i++) s = hostReduce(s, 'b', { type: 'REACT', emoji: '👏' });
     expect(s.reactions).toHaveLength(6);
     expect(s.reactions![5].id).toBe(11);
+  });
+
+  it('turns late joiners and overflow into spectators who cannot play', () => {
+    const s = hostReduce(playing(), 'late', { type: 'JOIN', name: 'Late' });
+    expect(s.players).toHaveLength(3);
+    expect(s.spectators).toEqual([{ id: 'late', name: 'Late' }]);
+    expect(hostReduce(s, 'late', { type: 'JOIN', name: 'Late' })).toBe(s); // repeated JOIN just returns a snapshot
+    expect(hostReduce(s, 'late', { type: 'SUBMIT', extractedRgb: { r: 1, g: 2, b: 3 } })).toBe(s);
+    expect(hostReduce(s, 'late', { type: 'VOTES', votes: {} })).toBe(s);
+    let full = createRoom('ABCD', 'h', 'Host');
+    for (let i = 0; i < 9; i++) full = hostReduce(full, `p${i}`, { type: 'JOIN', name: `P${i}` });
+    expect(full.players).toHaveLength(8);
+    expect(full.spectators).toHaveLength(2); // host + 7 players fill the room
   });
 
   it('only the host can start', () => {

@@ -36,7 +36,30 @@ export const loadOnlineSession = (): Session | null => {
     return null;
   }
 };
-const saveSession = (s: Session | null) => (s ? sessionStorage.setItem(KEY, JSON.stringify(s)) : sessionStorage.removeItem(KEY));
+const LAST_KEY = 'colorhunt.online.last';
+const REJOIN_MS = 3 * 60 * 60 * 1000;
+/** The same device may rejoin its own seat (same signing key) after closing the tab; nobody else holds that key. */
+export const loadRejoinOffer = (): Session | null => {
+  try {
+    const last = JSON.parse(localStorage.getItem(LAST_KEY) ?? 'null') as { session: Session; at: number } | null;
+    return last?.session?.identity && Date.now() - last.at < REJOIN_MS ? last.session : null;
+  } catch {
+    return null;
+  }
+};
+const saveSession = (s: Session | null) => {
+  try {
+    if (s) {
+      sessionStorage.setItem(KEY, JSON.stringify(s));
+      localStorage.setItem(LAST_KEY, JSON.stringify({ session: s, at: Date.now() }));
+    } else {
+      sessionStorage.removeItem(KEY);
+      localStorage.removeItem(LAST_KEY);
+    }
+  } catch {
+    // storage blocked: rejoin after a refresh may not work
+  }
+};
 
 const hex = ({ r, g, b }: RGB) => `#${[r, g, b].map(n => Math.round(n).toString(16).padStart(2, '0')).join('')}`.toUpperCase();
 const shell = 'flex h-full w-full flex-col items-center overflow-y-auto bg-neutral-950 p-6 py-10 pb-28 text-white gap-6';
@@ -191,7 +214,7 @@ function Room({ session, onSession, onLeave }: { session: Session; onSession: (s
         </div>
       )}
       <RoomView session={session} onLeave={onLeave} room={room} />
-      {room.state && ['voting', 'leaderboard', 'final'].includes(room.state.phase) && room.state.players.some(p => p.id === session.playerId) && <ReactionBar state={room.state} send={room.send} />}
+      {room.state && ['voting', 'leaderboard', 'final'].includes(room.state.phase) && (room.state.players.some(p => p.id === session.playerId) || room.state.spectators?.some(w => w.id === session.playerId)) && <ReactionBar state={room.state} send={room.send} />}
     </div>
   );
 }
@@ -213,10 +236,30 @@ function RoomView({ session, onLeave, room: { state, send, notFound } }: { sessi
       </div>
     );
   }
+  if (!state.players.some(p => p.id === me) && state.spectators?.some(w => w.id === me)) {
+    const watchRound = state.rounds[state.rounds.length - 1];
+    const watchName = (id: string) => state.players.find(p => p.id === id)?.name ?? '?';
+    return (
+      <div className={shell}>
+        <p className="rounded-full bg-white/10 px-4 py-1 text-xs uppercase tracking-wide text-neutral-300">Spectating room {state.code}</p>
+        {state.phase === 'lobby' && <p className="text-neutral-400">Waiting for the game to start…</p>}
+        {watchRound && (state.phase === 'playing' || state.phase === 'voting') && (
+          <>
+            <p className="text-neutral-400">Round {watchRound.roundNumber} · {state.phase === 'playing' ? 'players are hunting' : 'players are voting'}</p>
+            <ColorSwatch hex={watchRound.targetColor.hex} label="Target" sublabel={watchRound.targetColor.name} />
+            {watchRound.theme && <p className="text-sm text-yellow-300">{watchRound.theme}</p>}
+          </>
+        )}
+        {watchRound && state.phase === 'leaderboard' && <RoundReveal target={watchRound.targetColor} results={watchRound.results} nameOf={watchName} />}
+        <Standings state={state} />
+        <button onClick={onLeave} className="text-sm text-neutral-400 underline">Leave</button>
+      </div>
+    );
+  }
   if (!state.players.some(p => p.id === me)) {
     return (
       <div className={`${shell} justify-center`}>
-        <p>This room is full or already playing.</p>
+        <p>This room is full.</p>
         <button onClick={onLeave} className="text-sm text-neutral-400 underline">Back</button>
       </div>
     );
@@ -390,6 +433,7 @@ export function OnlineGame({ onExit }: { onExit: () => void }) {
   const [name, setName] = useState('');
   const [code, setCode] = useState('');
 
+  const [rejoin] = useState(() => (loadOnlineSession() ? null : loadRejoinOffer()));
   const update = useCallback((s: Session) => {
     saveSession(s);
     setSession(s);
@@ -417,6 +461,11 @@ export function OnlineGame({ onExit }: { onExit: () => void }) {
       ) : (
         <div className="flex w-full max-w-sm flex-col gap-3">
           <input value={name} onChange={e => setName(e.target.value)} maxLength={20} placeholder="Your name" aria-label="Your name" className="rounded-lg bg-black px-4 py-2 outline-none focus:ring-2 focus:ring-pink-500" />
+          {rejoin && (
+            <button onClick={() => update(rejoin)} className="rounded-full border border-yellow-400/60 px-6 py-2 text-sm font-semibold text-yellow-300">
+              Rejoin room {rejoin.code} as {rejoin.name}
+            </button>
+          )}
           <button onClick={create} disabled={!trimmed} className={primary}>Create room</button>
           <div className="flex gap-2">
             <input value={code} onChange={e => setCode(e.target.value)} maxLength={4} placeholder="CODE" aria-label="Room code" className="w-28 rounded-lg bg-black px-4 py-2 text-center font-mono uppercase outline-none focus:ring-2 focus:ring-pink-500" />
