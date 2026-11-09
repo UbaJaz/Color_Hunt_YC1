@@ -5,6 +5,7 @@ import type { Difficulty } from '../types/color';
 
 interface LobbyScreenProps {
   onStartGame: (settings: GameSettings) => void;
+  onPlayOnline?: () => void;
 }
 
 const DIFFICULTY_OPTIONS: { label: string; value: Difficulty; description: string }[] = [
@@ -16,7 +17,7 @@ const DIFFICULTY_OPTIONS: { label: string; value: Difficulty; description: strin
 const ROUND_OPTIONS = [3, 5, 7];
 const MAX_PLAYERS = 8;
 
-export function LobbyScreen({ onStartGame }: LobbyScreenProps) {
+export function LobbyScreen({ onStartGame, onPlayOnline }: LobbyScreenProps) {
   const { state, addPlayer, removePlayer } = useGameState();
   const [name, setName] = useState('');
 
@@ -170,6 +171,9 @@ export function LobbyScreen({ onStartGame }: LobbyScreenProps) {
       >
         Start Game
       </button>
+      {onPlayOnline && (
+        <button onClick={onPlayOnline} className="text-sm text-neutral-400 underline">Play online with friends</button>
+      )}
     </div>
   );
 }

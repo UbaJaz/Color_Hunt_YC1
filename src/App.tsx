@@ -9,21 +9,22 @@ import { GameStateProvider, useGameState } from './state/GameStateContext';
 import type { GameSettings } from './types/game';
 import { finalizeResults } from './utils/voting';
 import { clearSave, loadSave, writeSave } from './utils/save';
+import { OnlineGame, loadOnlineSession } from './screens/OnlineGame';
 
 const MAX_RETAKES = 3;
 
-type ScreenId = 'lobby' | 'howto' | 'calibration' | 'capture' | 'results' | 'voting' | 'leaderboard' | 'final';
+type ScreenId = 'online' | 'lobby' | 'howto' | 'calibration' | 'capture' | 'results' | 'voting' | 'leaderboard' | 'final';
 
 function AppShell() {
   const { currentRound, state, startGame, startRound, resetGame, recordVotes, loadState } = useGameState();
-  const [screen, setScreen] = useState<ScreenId>('lobby');
+  const [screen, setScreen] = useState<ScreenId>(() => (loadOnlineSession() ? 'online' : 'lobby'));
   const [retakesUsed, setRetakesUsed] = useState(0); // per turn; the capture screen remounts per retake so the timer restarts
 
   const [saved, setSaved] = useState(loadSave); // a game interrupted by a reload or closed tab
 
   useEffect(() => {
     if (screen === 'final') clearSave();
-    else if (screen !== 'lobby' && screen !== 'howto') writeSave({ state, screen, retakesUsed });
+    else if (screen !== 'lobby' && screen !== 'howto' && screen !== 'online') writeSave({ state, screen, retakesUsed });
   }, [state, screen, retakesUsed]);
 
   const handleResume = () => {
@@ -112,7 +113,8 @@ function AppShell() {
           <button onClick={handleDiscardSave} className="text-sm text-neutral-400 underline">Start a new game</button>
         </div>
       )}
-      {screen === 'lobby' && !saved && <LobbyScreen onStartGame={handleStartGame} />}
+      {screen === 'online' && <OnlineGame onExit={() => setScreen('lobby')} />}
+      {screen === 'lobby' && !saved && <LobbyScreen onStartGame={handleStartGame} onPlayOnline={() => setScreen('online')} />}
       {screen === 'howto' && (
         <div className="flex h-full w-full flex-col items-center justify-center gap-6 bg-neutral-950 p-6 text-center text-white">
           <h1 className="text-3xl font-bold">How to play</h1>

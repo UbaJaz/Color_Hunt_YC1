@@ -1,4 +1,4 @@
-import { useCallback, useRef, useState } from 'react';
+import { useCallback, useMemo, useRef, useState } from 'react';
 import { CameraView } from '../components/camera/CameraView';
 import { CaptureButton } from '../components/camera/CaptureButton';
 import { PhotoPreview } from '../components/camera/PhotoPreview';
@@ -8,21 +8,33 @@ import { extractColorFromCanvas, rgbToLab, deltaE2000, deltaEToMatchScore, calcu
 import type { CapturedPhoto } from '../types/capture';
 import type { TapSelection } from '../hooks/useTapSelection';
 import { Timer } from '../components/ui/Timer';
+import type { RGB, TargetColor } from '../types/color';
 
 const TURN_SECONDS = 45;
 
-interface CaptureScreenProps {
-  onRoundResultReady: () => void;
+/** Online play: the host scores, so this screen only reports the extracted colour (null = timed out). */
+export interface OnlineCapture {
+  targetColor: TargetColor;
+  roundNumber: number;
+  playerName: string;
+  memoryMode: boolean;
+  onSubmit: (extractedRgb: RGB | null) => void;
 }
 
-export function CaptureScreen({ onRoundResultReady }: CaptureScreenProps) {
-  const { state, currentRound, recordResult } = useGameState();
+interface CaptureScreenProps {
+  onRoundResultReady: () => void;
+  online?: OnlineCapture;
+}
+
+export function CaptureScreen({ onRoundResultReady, online }: CaptureScreenProps) {
+  const { state, currentRound: localRound, recordResult } = useGameState();
+  const currentRound = useMemo(() => (online ? { targetColor: online.targetColor, roundNumber: online.roundNumber, currentPlayerIndex: 0 } : localRound), [online, localRound]);
   const videoElRef = useRef<HTMLVideoElement | null>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const [capturedPhoto, setCapturedPhoto] = useState<CapturedPhoto | null>(null);
   const [videoReady, setVideoReady] = useState(false);
 
-  const player = state.players[currentRound!.currentPlayerIndex];
+  const player = useMemo(() => (online ? { id: 'me', name: online.playerName } : state.players[currentRound!.currentPlayerIndex]), [online, state.players, currentRound]);
 
   const handleStreamReady = useCallback((video: HTMLVideoElement) => {
     videoElRef.current = video;
@@ -66,6 +78,11 @@ export function CaptureScreen({ onRoundResultReady }: CaptureScreenProps) {
         state.calibrationMatrix || undefined
       );
 
+      if (online) {
+        online.onSubmit(extraction.extractedRgb);
+        return;
+      }
+
       const targetLab = rgbToLab(currentRound.targetColor.rgb);
       const deltaE = deltaE2000(extraction.extractedLab, targetLab);
       // Smooth curve (dE 5 -> 90, 15 -> 50, 30 -> 20, 60 -> ~6). The old `100 - deltaE`
@@ -98,12 +115,16 @@ export function CaptureScreen({ onRoundResultReady }: CaptureScreenProps) {
 
       onRoundResultReady();
     },
-    [state.calibrationMatrix, player, currentRound, recordResult, onRoundResultReady]
+    [state.calibrationMatrix, player, currentRound, recordResult, onRoundResultReady, online]
   );
 
   /** Out of time: no capture means no points (auto-scoring the frame centre rewarded doing nothing). */
   const handleTimeExpire = useCallback(() => {
     if (!player) return;
+    if (online) {
+      online.onSubmit(null);
+      return;
+    }
     recordResult({
       playerId: player.id,
       region: null,
@@ -115,7 +136,7 @@ export function CaptureScreen({ onRoundResultReady }: CaptureScreenProps) {
       finalScore: null,
     });
     onRoundResultReady();
-  }, [player, recordResult, onRoundResultReady]);
+  }, [player, recordResult, onRoundResultReady, online]);
 
   if (!currentRound || !player) return null;
 
@@ -133,7 +154,7 @@ export function CaptureScreen({ onRoundResultReady }: CaptureScreenProps) {
         />
       ) : (
         <div className="relative flex-1 bg-black">
-          <TargetColorBanner targetColor={currentRound.targetColor} roundNumber={currentRound.roundNumber} hideSwatchAfterMs={state.settings?.memoryMode ? 4000 : undefined} />
+          <TargetColorBanner targetColor={currentRound.targetColor} roundNumber={currentRound.roundNumber} hideSwatchAfterMs={(online ? online.memoryMode : state.settings?.memoryMode) ? 4000 : undefined} />
           <div className="absolute top-24 inset-x-0 z-10 flex justify-center">
             <div className="bg-black/50 px-4 py-2 rounded-full backdrop-blur-md flex items-center gap-4">
               <span className="text-white font-medium">{player?.name}'s Turn</span>
