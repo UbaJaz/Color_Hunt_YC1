@@ -26,24 +26,37 @@ test('host and guest create, join, play a round, vote and see the reveal', async
   await expect(host.getByText('Guesty')).toBeVisible({ timeout: 20_000 });
 
   await host.getByRole('button', { name: 'Start game' }).click();
-  for (const page of [host, guest]) {
-    await page.getByRole('button', { name: 'Skip, use default' }).click();
-    await uploadAndConfirm(page);
-    await page.getByRole('button', { name: 'Submit', exact: true }).click();
+  for (const page of [host, guest]) await page.getByRole('button', { name: 'Skip, use default' }).click();
+
+  for (let round = 1; round <= 3; round++) {
+    for (const page of [host, guest]) {
+      await uploadAndConfirm(page);
+      await page.getByRole('button', { name: 'Submit', exact: true }).click();
+    }
+    for (const page of [host, guest]) {
+      await expect(page.getByRole('heading', { name: 'Cast your votes' })).toBeVisible({ timeout: 20_000 });
+      await page.getByRole('button', { name: /Unlikely/ }).click();
+      await page.getByRole('button', { name: 'Submit votes' }).click();
+    }
+    for (const page of [host, guest]) {
+      await expect(page.getByRole('heading', { name: `Round ${round} results` })).toBeVisible({ timeout: 20_000 });
+      await expect(page.getByText('Target', { exact: true })).toBeVisible();
+    }
+    if (round < 3) {
+      // Emoji reactions reach the other player.
+      if (round === 1) {
+        await guest.getByRole('button', { name: 'React 🔥' }).click();
+        await expect(host.getByText('Guesty 🔥')).toBeVisible({ timeout: 10_000 });
+      }
+      await host.getByRole('button', { name: 'Start next round' }).click();
+    } else {
+      await host.getByRole('button', { name: 'Final results' }).click();
+    }
   }
 
+  // Final screen: standings plus this device's saved stats (recorded once per game, online too).
   for (const page of [host, guest]) {
-    await expect(page.getByRole('heading', { name: 'Cast your votes' })).toBeVisible({ timeout: 20_000 });
-    await page.getByRole('button', { name: /Unlikely/ }).click();
-    await page.getByRole('button', { name: 'Submit votes' }).click();
+    await expect(page.getByRole('heading', { name: 'Game Over!' })).toBeVisible({ timeout: 20_000 });
+    await expect(page.getByText(/1 played/)).toBeVisible();
   }
-
-  for (const page of [host, guest]) {
-    await expect(page.getByRole('heading', { name: 'Round 1 results' })).toBeVisible({ timeout: 20_000 });
-    await expect(page.getByText('Target', { exact: true })).toBeVisible();
-  }
-
-  // Emoji reactions reach the other player.
-  await guest.getByRole('button', { name: 'React 🔥' }).click();
-  await expect(host.getByText('Guesty 🔥')).toBeVisible({ timeout: 10_000 });
 });

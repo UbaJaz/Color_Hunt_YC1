@@ -138,6 +138,7 @@ describe('host reducer', () => {
     s = run(s, ['h', { type: 'AGAIN' }]);
     expect(s.phase).toBe('lobby');
     expect(s.players.every(p => p.totalScore === 0)).toBe(true);
+    expect(s.game).toBe(1); // a new game in the same room, so stats are recorded again
   });
 });
 

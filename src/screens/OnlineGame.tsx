@@ -13,8 +13,10 @@ import type { Vote } from '../utils/voting';
 import { shareResults } from '../utils/shareCard';
 import { fanfare, tick } from '../utils/sound';
 import { PrefsPanel } from '../components/ui/PrefsPanel';
+import { FinalStats } from '../components/ui/FinalStats';
+import { loadStats, recordGame, type Stats } from '../utils/stats';
 import { combineParts, scorePart } from '../utils/pair';
-import { dailySeed, makeSeed, parseChallenge } from '../utils/challenge';
+import { dailySeed, isDailySeed, makeSeed, parseChallenge } from '../utils/challenge';
 
 /** Per-tab (sessionStorage) so two tabs are two players, and a refresh rejoins the same seat. */
 interface Session {
@@ -28,6 +30,7 @@ interface Session {
   auth?: AuthRegistry; // host: registered player keys and last-seen seq
 }
 const KEY = 'colorhunt.online';
+const RECORDED_KEY = 'colorhunt.online.recorded';
 export const MAX_RETAKES = 3;
 const HEARTBEAT_MS = 5000;
 const HOST_TIMEOUT_MS = 15000;
@@ -232,9 +235,29 @@ function RoomView({ session, onLeave, room: { state, send, notFound } }: { sessi
   const [votes, setVotes] = useState<Record<string, Vote>>({});
   const me = session.playerId;
   const phase = state?.phase;
+  const [finalStats, setFinalStats] = useState<{ stats: Stats; newBest: boolean } | null>(null);
   useEffect(() => {
     if (phase === 'final') fanfare();
   }, [phase]);
+  // Fold the finished game into this device's stats once (a refresh on the final screen must not count it twice).
+  useEffect(() => {
+    if (!state || state.phase !== 'final' || !state.players.some(p => p.id === me)) return;
+    const key = `${state.code}:${state.game ?? 0}`;
+    try {
+      if (sessionStorage.getItem(RECORDED_KEY) === key) return;
+      sessionStorage.setItem(RECORDED_KEY, key);
+    } catch {
+      // storage blocked: fall through and record once per mount
+    }
+    const deltas = state.rounds.flatMap(r => r.results.filter(x => x.playerId === me).map(x => x.deltaE)).filter((d): d is number => d != null);
+    setFinalStats(recordGame({
+      bestTotal: state.players.find(p => p.id === me)?.totalScore ?? 0,
+      bestDeltaE: deltas.length ? Math.min(...deltas) : null,
+      dailySeed: isDailySeed(state.settings?.seed) ? state.settings?.seed : undefined,
+    }));
+    // keyed on the game, not on every snapshot
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [state?.phase, state?.game]);
 
   if (!state) {
     return (
@@ -447,7 +470,8 @@ function RoomView({ session, onLeave, room: { state, send, notFound } }: { sessi
       <p className="text-5xl">🏆</p>
       <h1 className="text-3xl font-bold text-yellow-400">Game Over!</h1>
       <Standings state={state} />
-      <button onClick={() => void shareResults(state.players, state.settings?.roundCount ?? 0)} className="text-sm text-neutral-300 underline">Share results</button>
+      <FinalStats stats={finalStats?.stats ?? loadStats()} newBest={finalStats?.newBest ?? false} daily={isDailySeed(state.settings?.seed)} />
+      <button onClick={() => void shareResults(state.players, state.settings?.roundCount ?? 0, isDailySeed(state.settings?.seed) ? `Daily challenge ${state.settings?.seed?.slice(1)}` : undefined)} className="text-sm text-neutral-300 underline">Share results</button>
       {isHost ? <button onClick={() => send({ type: 'AGAIN' })} className={primary}>Play again</button> : <p className="text-neutral-400">Waiting for the host…</p>}
       <button onClick={onLeave} className="text-sm text-neutral-400 underline">Leave</button>
     </div>

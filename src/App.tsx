@@ -9,6 +9,7 @@ import { GameStateProvider, useGameState } from './state/GameStateContext';
 import type { GameSettings } from './types/game';
 import { finalizeResults } from './utils/voting';
 import { shareResults } from './utils/shareCard';
+import { FinalStats } from './components/ui/FinalStats';
 import { fanfare } from './utils/sound';
 import { isDailySeed } from './utils/challenge';
 import { recordGame, type Stats } from './utils/stats';
@@ -179,15 +180,7 @@ function AppShell() {
               </div>
             ))}
           </div>
-          {finalStats && (
-            <div className="text-center text-xs text-neutral-400">
-              {finalStats.newBest && <p className="mb-1 text-sm font-bold text-yellow-300">New personal best!</p>}
-              {isDailySeed(state.settings?.seed) && <p className="mb-1 text-sm font-bold text-orange-300">🔥 {finalStats.stats.dailyStreak} day daily streak</p>}
-              <p>
-                Best game {finalStats.stats.bestTotal} · Closest match ΔE {finalStats.stats.bestDeltaE?.toFixed(1) ?? '—'} · {finalStats.stats.gamesPlayed} played
-              </p>
-            </div>
-          )}
+          {finalStats && <FinalStats stats={finalStats.stats} newBest={finalStats.newBest} daily={isDailySeed(state.settings?.seed)} />}
           <button onClick={() => void shareResults(sortedForFinal, state.settings?.roundCount ?? 0, isDailySeed(state.settings?.seed) ? `Daily challenge ${state.settings?.seed?.slice(1)}` : undefined)} className="text-sm text-neutral-300 underline">
             Share results
           </button>

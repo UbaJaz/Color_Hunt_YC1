@@ -30,6 +30,8 @@ export interface OnlineState {
   reactions?: Reaction[];
   /** Late joiners and overflow: they watch and react but never score. */
   spectators?: { id: string; name: string }[];
+  /** Counts finished games in this room (bumped by AGAIN), so a result is recorded once per game. */
+  game?: number;
 }
 
 /** What a client may ask for. Scores are never sent: the host derives them from the colour. */
@@ -171,7 +173,7 @@ export function hostReduce(state: OnlineState, from: string, intent: Intent, pic
     }
     case 'AGAIN': {
       if (!isHost || state.phase !== 'final') return state;
-      return { ...state, phase: 'lobby', rounds: [], settings: null, ballots: {}, reactions: [], players: state.players.map(p => ({ ...p, totalScore: 0 })) };
+      return { ...state, phase: 'lobby', rounds: [], settings: null, ballots: {}, reactions: [], game: (state.game ?? 0) + 1, players: state.players.map(p => ({ ...p, totalScore: 0 })) };
     }
     default:
       return state;
