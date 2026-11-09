@@ -32,6 +32,10 @@ export interface OnlineState {
   spectators?: { id: string; name: string }[];
   /** Counts finished games in this room (bumped by AGAIN), so a result is recorded once per game. */
   game?: number;
+  /** Bumped each time another player takes over as host. Snapshots from an older epoch are ignored. */
+  epoch?: number;
+  /** Every member's public signing key. Kept in the state so a successor can verify players after the host is gone. */
+  keys?: Record<string, JsonWebKey>;
 }
 
 /** What a client may ask for. Scores are never sent: the host derives them from the colour. */
@@ -48,7 +52,7 @@ export type Intent =
 export const MAX_PLAYERS = 8;
 export const MAX_SPECTATORS = 16;
 
-export function createRoom(code: string, hostId: string, hostName: string): OnlineState {
+export function createRoom(code: string, hostId: string, hostName: string, hostPub?: JsonWebKey): OnlineState {
   return {
     code,
     hostId,
@@ -59,7 +63,19 @@ export function createRoom(code: string, hostId: string, hostName: string): Onli
     ballots: {},
     reactions: [],
     spectators: [],
+    epoch: 0,
+    keys: hostPub ? { [hostId]: hostPub } : {},
   };
+}
+
+/** Players who could take over if the host disappears, in the order they joined. Only players with a known key qualify. */
+export function successors(state: OnlineState): string[] {
+  return state.players.filter(p => p.id !== state.hostId && state.keys?.[p.id]).map(p => p.id);
+}
+
+/** `me` becomes the host of the same game: scores, phase and ballots carry over untouched. */
+export function promoteHost(state: OnlineState, me: string): OnlineState {
+  return { ...state, hostId: me, epoch: (state.epoch ?? 0) + 1 };
 }
 
 export type PickTarget = (settings: GameSettings, excludeId: string | undefined, roundNumber: number, slot?: 1 | 2) => Round['targetColor'];

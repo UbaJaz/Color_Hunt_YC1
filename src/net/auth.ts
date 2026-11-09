@@ -90,3 +90,31 @@ export async function verifyState(msg: StateMsg, pinned: JsonWebKey | null): Pro
   if (pinned && JSON.stringify(pinned) !== JSON.stringify(msg.pub)) return false;
   return verify(msg.pub, JSON.stringify(msg.state), msg.sig);
 }
+
+export type StateVerdict = 'pinned' | 'migrated' | false;
+
+const sameKey = (a: JsonWebKey | null | undefined, b: JsonWebKey | null | undefined) => !!a && !!b && JSON.stringify(a) === JSON.stringify(b);
+
+/**
+ * Decides whether a signed snapshot may replace what we hold.
+ *  - 'pinned': signed by the host key we already trust (or the very first host we meet) and not older than ours.
+ *  - 'migrated': signed by a player who claims the host role. Allowed only if that player is a member whose key we
+ *    already hold in our current state, the epoch moved forward, and the claimant is not the host we believe in.
+ *    If two players claim the same epoch, the one who joined earlier wins, so everyone converges on one host.
+ * Whoever is in the room can still claim host (same trust as the room code); outsiders cannot, as they have no registered key.
+ */
+export async function acceptState(msg: StateMsg, current: OnlineState | null, pinned: JsonWebKey | null): Promise<StateVerdict> {
+  if (!msg?.state || !msg.pub || typeof msg.sig !== 'string') return false;
+  if (!(await verify(msg.pub, JSON.stringify(msg.state), msg.sig))) return false;
+  const epoch = msg.state.epoch ?? 0;
+  const have = current?.epoch ?? 0;
+  if (!pinned) return 'pinned';
+  if (sameKey(pinned, msg.pub)) return epoch >= have ? 'pinned' : false;
+  if (!current) return false;
+  const claimant = msg.state.hostId;
+  if (claimant === current.hostId || !sameKey(current.keys?.[claimant], msg.pub)) return false;
+  const order = current.players.map(p => p.id);
+  if (!order.includes(claimant)) return false;
+  if (epoch > have) return 'migrated';
+  return epoch === have && order.indexOf(claimant) < order.indexOf(current.hostId) ? 'migrated' : false;
+}
