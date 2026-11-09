@@ -2,6 +2,7 @@ import { createContext, useCallback, useContext, useMemo, useReducer, type React
 import type { GameState, GameSettings, Player, Round, RoundResult } from '../types/game';
 import { getRandomTargetColor, getDynamicTargetColor } from '../data/targetColors';
 import type { CalibrationMatrix } from '@color-science';
+import { seededRng } from '../utils/challenge';
 
 type Action =
   | { type: 'START_GAME'; payload: GameSettings }
@@ -21,17 +22,18 @@ type Action =
  * (getDynamicTargetColor) with the configured difficulty.
  * Otherwise fall back to the curated preset list, excluding the previous round's colour.
  */
-function pickTargetColor(settings: GameSettings | null, excludeColorId?: string) {
+function pickTargetColor(settings: GameSettings | null, excludeColorId?: string, roundNumber = 1) {
+  const rng = settings?.seed ? seededRng(settings.seed, roundNumber) : undefined;
   if (settings?.useRandomColor) {
-    return getDynamicTargetColor(settings.difficulty);
+    return getDynamicTargetColor(settings.difficulty, rng);
   }
-  return getRandomTargetColor(excludeColorId);
+  return getRandomTargetColor(excludeColorId, rng);
 }
 
 function createRound(roundNumber: number, settings: GameSettings | null, excludeColorId?: string): Round {
   return {
     roundNumber,
-    targetColor: pickTargetColor(settings, excludeColorId),
+    targetColor: pickTargetColor(settings, excludeColorId, roundNumber),
     results: [],
     currentPlayerIndex: 0,
   };

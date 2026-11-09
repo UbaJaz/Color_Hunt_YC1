@@ -12,7 +12,7 @@ export type Difficulty = 'easy' | 'medium' | 'hard';
  * - medium: Moderate chroma, slightly varied lightness (pastels, darkish colors).
  * - hard: Very low chroma or extreme lightness (browns, off-whites, very dark colors).
  */
-export function generateRandomTargetColor(difficulty: Difficulty = 'medium'): RGB {
+export function generateRandomTargetColor(difficulty: Difficulty = 'medium', rng: () => number = Math.random): RGB {
   let minL = 0, maxL = 100;
   let minC = 0, maxC = 100; // Chroma
   
@@ -27,13 +27,13 @@ export function generateRandomTargetColor(difficulty: Difficulty = 'medium'): RG
       break;
     case 'hard':
       // Hard mode: either very dark/light, or very low chroma (greys/browns)
-      if (Math.random() > 0.5) {
+      if (rng() > 0.5) {
         // Low chroma
         minL = 30; maxL = 80;
         minC = 0; maxC = 20;
       } else {
         // Extreme lightness
-        if (Math.random() > 0.5) {
+        if (rng() > 0.5) {
           minL = 5; maxL = 25; // Dark
         } else {
           minL = 85; maxL = 98; // Light
@@ -43,11 +43,11 @@ export function generateRandomTargetColor(difficulty: Difficulty = 'medium'): RG
       break;
   }
 
-  const L = minL + Math.random() * (maxL - minL);
-  let C = minC + Math.random() * (maxC - minC);
+  const L = minL + rng() * (maxL - minL);
+  let C = minC + rng() * (maxC - minC);
   
   // Random hue angle (0 to 360 degrees) -> radians
-  const hueRad = Math.random() * Math.PI * 2;
+  const hueRad = rng() * Math.PI * 2;
   // High-chroma Lab points are often outside sRGB and would be silently clamped to a
   // different colour; shrink chroma until the colour survives the round trip.
   for (let i = 0; i < 30; i++) {

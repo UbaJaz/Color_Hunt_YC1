@@ -2,6 +2,7 @@ import { deltaE2000, deltaEToMatchScore, rgbToLab } from '@color-science';
 import type { RGB } from '../types/color';
 import type { GameSettings, Player, Round, RoundResult } from '../types/game';
 import { getDynamicTargetColor, getRandomTargetColor } from '../data/targetColors';
+import { seededRng } from '../utils/challenge';
 import { finalizeResults, type Ballots, type Vote } from '../utils/voting';
 
 export type Phase = 'lobby' | 'playing' | 'voting' | 'leaderboard' | 'final';
@@ -41,15 +42,19 @@ export function createRoom(code: string, hostId: string, hostName: string): Onli
   };
 }
 
-export type PickTarget = (settings: GameSettings, excludeId?: string) => Round['targetColor'];
-const defaultPick: PickTarget = (s, ex) => (s.useRandomColor ? getDynamicTargetColor(s.difficulty) : getRandomTargetColor(ex));
+export type PickTarget = (settings: GameSettings, excludeId: string | undefined, roundNumber: number) => Round['targetColor'];
+const defaultPick: PickTarget = (s, ex, n) => {
+  const rng = s.seed ? seededRng(s.seed, n) : undefined;
+  return s.useRandomColor ? getDynamicTargetColor(s.difficulty, rng) : getRandomTargetColor(ex, rng);
+};
 
 const validByte = (n: unknown) => typeof n === 'number' && Number.isFinite(n) && n >= 0 && n <= 255;
 const validRgb = (c: RGB | null): c is RGB => !!c && validByte(c.r) && validByte(c.g) && validByte(c.b);
 
 function newRound(state: OnlineState, pick: PickTarget): Round {
   const prev = state.rounds[state.rounds.length - 1];
-  return { roundNumber: state.rounds.length + 1, targetColor: pick(state.settings!, prev?.targetColor.id), results: [], currentPlayerIndex: 0 };
+  const roundNumber = state.rounds.length + 1;
+  return { roundNumber, targetColor: pick(state.settings!, prev?.targetColor.id, roundNumber), results: [], currentPlayerIndex: 0 };
 }
 
 function scoreResult(playerId: string, rgb: RGB | null, target: RGB): RoundResult {

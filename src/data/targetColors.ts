@@ -42,9 +42,9 @@ export const TARGET_COLORS: readonly TargetColor[] = [
 ];
 
 /** Picks a random color from the curated preset list, optionally excluding the last one. */
-export function getRandomTargetColor(excludeId?: string): TargetColor {
+export function getRandomTargetColor(excludeId?: string, rng: () => number = Math.random): TargetColor {
   const pool = excludeId ? TARGET_COLORS.filter((c) => c.id !== excludeId) : TARGET_COLORS;
-  const index = Math.floor(Math.random() * pool.length);
+  const index = Math.floor(rng() * pool.length);
   return pool[index];
 }
 
@@ -56,8 +56,8 @@ export function getRandomTargetColor(excludeId?: string): TargetColor {
  *
  * Used when the host enables "Random Color" mode in the Lobby settings.
  */
-export function getDynamicTargetColor(difficulty: Difficulty = 'medium'): TargetColor {
-  const rgb = generateRandomTargetColor(difficulty);
+export function getDynamicTargetColor(difficulty: Difficulty = 'medium', rng: () => number = Math.random): TargetColor {
+  const rgb = generateRandomTargetColor(difficulty, rng);
   const hex = rgbToHex(rgb);
   return {
     id: `dynamic-${hex}`,

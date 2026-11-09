@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { useGameState } from '../state/GameStateContext';
 import type { GameSettings } from '../types/game';
 import type { Difficulty } from '../types/color';
+import { buildChallengeUrl, makeSeed, parseChallenge } from '../utils/challenge';
 
 interface LobbyScreenProps {
   onStartGame: (settings: GameSettings) => void;
@@ -22,10 +23,20 @@ export function LobbyScreen({ onStartGame, onPlayOnline }: LobbyScreenProps) {
   const [name, setName] = useState('');
 
   // Game settings state — lives here until the host taps Start
-  const [roundCount, setRoundCount] = useState(3);
-  const [difficulty, setDifficulty] = useState<Difficulty>('medium');
-  const [useRandomColor, setUseRandomColor] = useState(false);
-  const [memoryMode, setMemoryMode] = useState(false);
+  const [challenge] = useState(() => parseChallenge(window.location.search)); // opened from a friend's challenge link
+  const [roundCount, setRoundCount] = useState(challenge?.roundCount ?? 3);
+  const [difficulty, setDifficulty] = useState<Difficulty>(challenge?.difficulty ?? 'medium');
+  const [useRandomColor, setUseRandomColor] = useState(challenge?.useRandomColor ?? false);
+  const [memoryMode, setMemoryMode] = useState(challenge?.memoryMode ?? false);
+  const [seed, setSeed] = useState(challenge?.seed);
+  const [copied, setCopied] = useState(false);
+
+  const copyChallenge = () => {
+    const s = seed ?? makeSeed();
+    setSeed(s);
+    void navigator.clipboard?.writeText(buildChallengeUrl(window.location.origin + window.location.pathname, { seed: s, roundCount, difficulty, useRandomColor, memoryMode }));
+    setCopied(true);
+  };
 
   const handleAddPlayer = (e: React.FormEvent) => {
     e.preventDefault();
@@ -39,7 +50,7 @@ export function LobbyScreen({ onStartGame, onPlayOnline }: LobbyScreenProps) {
 
   const handleStart = () => {
     if (state.players.length === 0) return;
-    onStartGame({ roundCount, difficulty, useRandomColor, memoryMode });
+    onStartGame({ roundCount, difficulty, useRandomColor, memoryMode, seed });
   };
 
   return (
@@ -159,6 +170,11 @@ export function LobbyScreen({ onStartGame, onPlayOnline }: LobbyScreenProps) {
           </div>
         </div>
       </div>
+
+      {seed && <p className="text-sm font-semibold text-yellow-400">Challenge mode: everyone gets the same colours</p>}
+      <button onClick={copyChallenge} className="text-sm text-neutral-300 underline">
+        {copied ? 'Link copied' : 'Copy challenge link'}
+      </button>
 
       <p className="max-w-sm text-center text-xs text-neutral-400">
         House rule: real objects only. No pointing the camera at another screen.

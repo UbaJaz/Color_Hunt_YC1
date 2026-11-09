@@ -32,6 +32,8 @@ export interface GameSettings {
   useRandomColor: boolean;
   /** Memory mode: the target swatch is hidden a few seconds into each turn. */
   memoryMode: boolean;
+  /** Challenge links: same seed gives the same target colours for everyone. */
+  seed?: string;
 }
 
 /**
