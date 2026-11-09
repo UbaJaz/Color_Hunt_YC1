@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
+import { deltaE2000, deltaEToMatchScore, rgbToLab } from '@color-science';
 import { useGameState } from '../state/GameStateContext';
 import { CaptureScreen } from './CaptureScreen';
 import { CalibrationScreen } from './CalibrationScreen';
@@ -18,6 +19,7 @@ interface Session {
   host: OnlineState | null; // the host's authoritative state, so a host refresh keeps the game
 }
 const KEY = 'colorhunt.online';
+export const MAX_RETAKES = 3;
 const HEARTBEAT_MS = 5000;
 const HOST_TIMEOUT_MS = 15000;
 export const loadOnlineSession = (): Session | null => {
@@ -133,6 +135,8 @@ function Room({ session, onSession, onLeave }: { session: Session; onSession: (s
 function RoomView({ session, onLeave, room: { state, send, notFound } }: { session: Session; onLeave: () => void; room: ReturnType<typeof useRoom> }) {
   const { state: local } = useGameState();
   const [calDone, setCalDone] = useState(false);
+  const [pending, setPending] = useState<{ round: number; rgb: RGB } | null>(null); // a confirmed capture awaiting Submit or Retake
+  const [retakes, setRetakes] = useState({ round: 0, n: 0 });
   const [settings, setSettings] = useState<GameSettings>({ roundCount: 3, difficulty: 'medium', useRandomColor: false, memoryMode: false });
   const [votes, setVotes] = useState<Record<string, Vote>>({});
   const me = session.playerId;
@@ -210,16 +214,39 @@ function RoomView({ session, onLeave, room: { state, send, notFound } }: { sessi
       );
     }
     if (!calDone && !local.calibrationMatrix) return <CalibrationScreen onCalibrationComplete={() => setCalDone(true)} />;
+    const retakesUsed = retakes.round === round.roundNumber ? retakes.n : 0;
+    if (pending?.round === round.roundNumber) {
+      const score = Math.round(deltaEToMatchScore(deltaE2000(rgbToLab(pending.rgb), rgbToLab(round.targetColor.rgb))));
+      const left = MAX_RETAKES - retakesUsed;
+      return (
+        <div className={`${shell} justify-center text-center`}>
+          <p className="text-sm uppercase tracking-wide text-neutral-400">Round {round.roundNumber}</p>
+          <div className="flex gap-6">
+            <ColorSwatch hex={round.targetColor.hex} label="Target" />
+            <ColorSwatch hex={hex(pending.rgb)} label="You" />
+          </div>
+          <p className="text-2xl font-bold">Score {score}</p>
+          <button onClick={() => send({ type: 'SUBMIT', extractedRgb: pending.rgb })} className={primary}>Submit</button>
+          <button
+            disabled={left <= 0}
+            onClick={() => { setPending(null); setRetakes({ round: round.roundNumber, n: retakesUsed + 1 }); }}
+            className="text-sm text-neutral-300 underline disabled:opacity-40"
+          >
+            Retake ({left} left)
+          </button>
+        </div>
+      );
+    }
     return (
       <CaptureScreen
-        key={round.roundNumber}
+        key={`${round.roundNumber}-${retakesUsed}`}
         onRoundResultReady={() => {}}
         online={{
           targetColor: round.targetColor,
           roundNumber: round.roundNumber,
           playerName: nameOf(me),
           memoryMode: !!state.settings?.memoryMode,
-          onSubmit: rgb => send({ type: 'SUBMIT', extractedRgb: rgb }),
+          onSubmit: rgb => (rgb ? setPending({ round: round.roundNumber, rgb }) : send({ type: 'SUBMIT', extractedRgb: null })),
         }}
       />
     );
