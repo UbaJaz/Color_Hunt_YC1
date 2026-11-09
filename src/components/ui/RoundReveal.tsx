@@ -1,9 +1,11 @@
+import { useEffect } from 'react';
 import { calculateVoteBonus } from '@color-science';
 import type { RGB, TargetColor } from '../../types/color';
 import type { RoundResult } from '../../types/game';
 import { precisionBonus, streakBonus } from '../../utils/voting';
 import { describeDifference, nearestColorName } from '../../utils/colorName';
 import { getPrefs } from '../../utils/prefs';
+import { chime } from '../../utils/sound';
 
 const hex = ({ r, g, b }: RGB) => '#' + [r, g, b].map(n => n.toString(16).padStart(2, '0')).join('').toUpperCase();
 
@@ -31,6 +33,10 @@ export function RoundReveal({ target, target2, results, nameOf }: RoundRevealPro
   const sorted = [...results].sort((a, b) => (b.finalScore ?? 0) - (a.finalScore ?? 0));
   const targets = target2 ? [target, target2] : [target];
   const aid = getPrefs().colourBlind;
+  const best = Math.max(0, ...results.map(r => r.finalScore ?? 0));
+  useEffect(() => {
+    if (best >= 90) chime();
+  }, [best]);
   return (
     <div className="flex w-full max-w-sm flex-col gap-3">
       <div className="flex items-center gap-3 rounded-xl bg-white/10 p-3">

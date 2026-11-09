@@ -11,6 +11,7 @@ import { Timer } from '../components/ui/Timer';
 import type { RGB, TargetColor } from '../types/color';
 import type { PairPart } from '../types/game';
 import { combineParts } from '../utils/pair';
+import { tick } from '../utils/sound';
 
 const TURN_SECONDS = 45;
 const PAIR_TURN_SECONDS = 60;
@@ -61,6 +62,7 @@ export function CaptureScreen({ onRoundResultReady, online }: CaptureScreenProps
     const video = videoElRef.current;
     const canvas = canvasRef.current;
     if (!video || !canvas || !videoReady) return;
+    tick();
 
     canvas.width = video.videoWidth;
     canvas.height = video.videoHeight;
@@ -102,6 +104,7 @@ export function CaptureScreen({ onRoundResultReady, online }: CaptureScreenProps
     (selection: TapSelection) => {
       const canvas = canvasRef.current;
       if (!canvas || !player || !currentRound) return;
+      tick();
 
       const extraction = extractColorFromCanvas(
         canvas,

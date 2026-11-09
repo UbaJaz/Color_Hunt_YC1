@@ -9,6 +9,7 @@ import { GameStateProvider, useGameState } from './state/GameStateContext';
 import type { GameSettings } from './types/game';
 import { finalizeResults } from './utils/voting';
 import { shareResults } from './utils/shareCard';
+import { fanfare } from './utils/sound';
 import { isDailySeed } from './utils/challenge';
 import { recordGame, type Stats } from './utils/stats';
 import { clearSave, loadSave, writeSave } from './utils/save';
@@ -40,6 +41,7 @@ function AppShell() {
     }
     if (recorded.current) return;
     recorded.current = true;
+    fanfare();
     const deltas = state.rounds.flatMap(r => r.results.map(x => x.deltaE)).filter((d): d is number => d != null);
     setFinalStats(recordGame({
       bestTotal: Math.max(0, ...state.players.map(p => p.totalScore)),

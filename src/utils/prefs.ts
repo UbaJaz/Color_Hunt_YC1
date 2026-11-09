@@ -3,9 +3,13 @@ const KEY = 'colorhunt-prefs-v1';
 export interface Prefs {
   /** Show colour names and "lighter / redder" hints next to swatches, so colour never has to be judged by eye alone. */
   colourBlind: boolean;
+  /** Beeps, chimes and the final fanfare. */
+  sound: boolean;
+  /** Short vibrations on capture, votes and big scores (phones only). */
+  haptics: boolean;
 }
 
-const DEFAULTS: Prefs = { colourBlind: false };
+const DEFAULTS: Prefs = { colourBlind: false, sound: true, haptics: true };
 
 export function getPrefs(): Prefs {
   try {

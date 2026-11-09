@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { useGameState } from '../state/GameStateContext';
 import { ColorSwatch } from '../components/ui/ColorSwatch';
 import { finalizeResults, type Ballots, type Vote } from '../utils/voting';
+import { tick } from '../utils/sound';
 import type { RGB } from '../types/color';
 
 function rgbToHex({ r, g, b }: RGB): string {
@@ -27,6 +28,7 @@ export function VotingScreen({ onVotingComplete }: { onVotingComplete: () => voi
   const targets = currentRound.results.filter(r => r.playerId !== voter.id && r.extractedRgb);
 
   const handleVote = (ownerId: string, vote: Vote) => {
+    tick();
     setBallots(prev => ({ ...prev, [voter.id]: { ...prev[voter.id], [ownerId]: vote } }));
   };
 

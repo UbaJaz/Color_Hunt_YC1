@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import type { RarityTier } from '@color-science';
+import { haptic } from '../utils/sound';
 
 export interface CelebrationOptions {
   /** Final score 0–100. Confetti fires if score ≥ 90. */
@@ -35,7 +36,7 @@ export function useCelebration({ score, rarityTier }: CelebrationOptions): UseCe
   const celebrate = useCallback(() => {
     setIsCelebrating(true);
     // Haptic feedback — silently ignored on non-supporting browsers
-    if ('vibrate' in navigator) navigator.vibrate(250);
+    haptic(250);
     // Auto-stop after animation completes (1.5s CSS duration)
     if (timerRef.current) clearTimeout(timerRef.current);
     timerRef.current = setTimeout(() => setIsCelebrating(false), 1600);

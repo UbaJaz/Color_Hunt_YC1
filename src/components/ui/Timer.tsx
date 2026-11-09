@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from 'react';
-import { beep } from '../../utils/sound';
+import { beep, buzz } from '../../utils/sound';
 
 export function Timer({
   durationSeconds = 60,
@@ -27,6 +27,7 @@ export function Timer({
   useEffect(() => {
     if (timeLeft <= 0 && !expired.current) {
       expired.current = true;
+      buzz();
       onExpire();
     }
   }, [timeLeft, onExpire]);

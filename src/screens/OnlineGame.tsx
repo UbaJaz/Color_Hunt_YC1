@@ -11,6 +11,7 @@ import type { RGB } from '../types/color';
 import { PACKS, type GameSettings } from '../types/game';
 import type { Vote } from '../utils/voting';
 import { shareResults } from '../utils/shareCard';
+import { fanfare, tick } from '../utils/sound';
 import { PrefsPanel } from '../components/ui/PrefsPanel';
 import { combineParts, scorePart } from '../utils/pair';
 import { dailySeed, makeSeed, parseChallenge } from '../utils/challenge';
@@ -189,6 +190,7 @@ function ReactionBar({ state, send }: { state: OnlineState; send: (i: Intent) =>
   const react = (emoji: string) => {
     if (Date.now() - last.current < 1000) return;
     last.current = Date.now();
+    tick();
     send({ type: 'REACT', emoji });
   };
   return (
@@ -229,6 +231,10 @@ function RoomView({ session, onLeave, room: { state, send, notFound } }: { sessi
   const [settings, setSettings] = useState<GameSettings>(() => parseChallenge(window.location.search) ?? { roundCount: 3, difficulty: 'medium', useRandomColor: false, memoryMode: false });
   const [votes, setVotes] = useState<Record<string, Vote>>({});
   const me = session.playerId;
+  const phase = state?.phase;
+  useEffect(() => {
+    if (phase === 'final') fanfare();
+  }, [phase]);
 
   if (!state) {
     return (
@@ -406,7 +412,7 @@ function RoomView({ session, onLeave, room: { state, send, notFound } }: { sessi
             </div>
             <div className="flex gap-4">
               {(['up', 'down'] as const).map(v => (
-                <button key={v} onClick={() => setVotes({ ...votes, [r.playerId]: v })} className={`rounded-full px-6 py-2 font-bold ${votes[r.playerId] === v ? (v === 'up' ? 'bg-green-500' : 'bg-red-500') : 'bg-neutral-800 text-neutral-400'}`}>
+                <button key={v} onClick={() => { tick(); setVotes({ ...votes, [r.playerId]: v }); }} className={`rounded-full px-6 py-2 font-bold ${votes[r.playerId] === v ? (v === 'up' ? 'bg-green-500' : 'bg-red-500') : 'bg-neutral-800 text-neutral-400'}`}>
                   {v === 'up' ? '👍 Unlikely' : '👎 Common'}
                 </button>
               ))}
