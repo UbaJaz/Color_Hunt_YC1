@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { finalizeResults } from './voting';
+import { finalizeResults, precisionBonus } from './voting';
 import { makeResult } from '../test/helpers';
 
 describe('finalizeResults', () => {
@@ -19,5 +19,13 @@ describe('finalizeResults', () => {
 
   it('treats no ballots as neutral', () => {
     expect(finalizeResults([makeResult('a', 70)], {})[0].finalScore).toBe(70);
+  });
+
+  it('adds a precision bonus only for near-exact matches', () => {
+    expect(precisionBonus(1.5)).toBe(5);
+    expect(precisionBonus(3)).toBe(3);
+    expect(precisionBonus(4)).toBe(0);
+    expect(precisionBonus(null)).toBe(0);
+    expect(finalizeResults([{ ...makeResult('a', 95), deltaE: 1 }], {})[0].finalScore).toBe(100);
   });
 });
