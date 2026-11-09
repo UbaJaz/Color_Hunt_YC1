@@ -36,7 +36,7 @@ export { estimateWhiteBalance, applyCalibration, validateCalibrationCard } from 
 export type { CalibrationMatrix } from './calibration.js';
 
 // Bonus voting logic (browser portable)
-export { calculateBonusMultiplier } from './bonusVoting.js';
+export { calculateBonusMultiplier, calculateVoteBonus } from './bonusVoting.js';
 export type { VoteTally } from './bonusVoting.js';
 
 // Random color generation with difficulty (browser portable)

@@ -73,9 +73,9 @@ export function isSuccessfulUnlock(score: number, confidence: ConfidenceLevel): 
  * Human-readable label and emoji for each tier — used in ResultsScreen
  * and future Collection Mode unlock cards.
  */
-export const RARITY_DISPLAY: Record<RarityTier, { label: string; emoji: string; color: string }> = {
-  common: { label: 'Common', emoji: '⚪', color: 'text-neutral-400' },
-  uncommon: { label: 'Uncommon', emoji: '🟢', color: 'text-green-400' },
-  rare: { label: 'Rare', emoji: '🔵', color: 'text-blue-400' },
-  'ultra-rare': { label: 'Ultra-Rare', emoji: '🟣', color: 'text-purple-400' },
+export const RARITY_DISPLAY: Record<RarityTier, { label: string; emoji: string; color: string; reason: string }> = {
+  common: { label: 'Common', emoji: '⚪', color: 'text-neutral-400', reason: 'A typical, easy-to-find colour' },
+  uncommon: { label: 'Uncommon', emoji: '🟢', color: 'text-green-400', reason: 'A muted or unusual tone' },
+  rare: { label: 'Rare', emoji: '🔵', color: 'text-blue-400', reason: 'Extremely vivid, or very dark / light' },
+  'ultra-rare': { label: 'Ultra-Rare', emoji: '🟣', color: 'text-purple-400', reason: 'A flat grey mid-tone, or pure black / white' },
 };

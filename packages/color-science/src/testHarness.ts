@@ -8,7 +8,7 @@ import { rgbToLab, labToRgb } from './colorConversion.js';
 import { deltaE2000, deltaEToScore, deltaEToMatchScore } from './ciede2000.js';
 import { RGB, Lab } from './types.js';
 import { estimateWhiteBalance, applyCalibration, validateCalibrationCard } from './calibration.js';
-import { calculateBonusMultiplier, VoteTally } from './bonusVoting.js';
+import { calculateBonusMultiplier, calculateVoteBonus, VoteTally } from './bonusVoting.js';
 import { calculateConfidence } from './confidence.js';
 import { getRarityTier, isSuccessfulUnlock } from './rarity.js';
 import path from 'path';
@@ -468,6 +468,14 @@ function testBonusVoting() {
     { votes: { thumbsUp: 7, thumbsDown: 3 }, expected: 1.4, description: '7 up, 3 down (70%) â†’ 1.4' },
     { votes: { thumbsUp: 2, thumbsDown: 8 }, expected: 1.0, description: '2 up, 8 down (20%) â†’ 1.0 (floor)' }
   ];
+
+  const bonusOk = calculateVoteBonus({ thumbsUp: 0, thumbsDown: 0 }) === 0 &&
+    calculateVoteBonus({ thumbsUp: 5, thumbsDown: 5 }) === 0 &&
+    calculateVoteBonus({ thumbsUp: 10, thumbsDown: 0 }) === 15 &&
+    calculateVoteBonus({ thumbsUp: 3, thumbsDown: 1 }) === 8 &&
+    calculateVoteBonus({ thumbsUp: 1, thumbsDown: 9 }) === 0;
+  console.log(`  ${bonusOk ? 'PASS' : 'FAIL'}: additive vote bonus 0..15`);
+  if (!bonusOk) process.exitCode = 1;
 
   console.log('\n' + '-'.repeat(80));
   console.log(`| ${'Description'.padEnd(35)} | ${'Up'.padEnd(5)} | ${'Down'.padEnd(5)} | ${'Expected'.padEnd(10)} | ${'Actual'.padEnd(10)} | ${'Result'.padEnd(10)} |`);
