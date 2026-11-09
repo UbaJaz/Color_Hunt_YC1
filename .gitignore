@@ -31,3 +31,7 @@ packages/color-science/node_modules/
 
 .env
 .claude/
+
+# Playwright
+test-results/
+playwright-report/
