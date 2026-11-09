@@ -12,6 +12,7 @@ import type { RGB } from '../types/color';
 import { PACKS, type GameSettings } from '../types/game';
 import type { Vote } from '../utils/voting';
 import { shareResults } from '../utils/shareCard';
+import { dailySeed, makeSeed, parseChallenge } from '../utils/challenge';
 
 /** Per-tab (sessionStorage) so two tabs are two players, and a refresh rejoins the same seat. */
 interface Session {
@@ -224,7 +225,7 @@ function RoomView({ session, onLeave, room: { state, send, notFound } }: { sessi
   const [calDone, setCalDone] = useState(false);
   const [pending, setPending] = useState<{ round: number; rgb: RGB } | null>(null); // a confirmed capture awaiting Submit or Retake
   const [retakes, setRetakes] = useState({ round: 0, n: 0 });
-  const [settings, setSettings] = useState<GameSettings>({ roundCount: 3, difficulty: 'medium', useRandomColor: false, memoryMode: false });
+  const [settings, setSettings] = useState<GameSettings>(() => parseChallenge(window.location.search) ?? { roundCount: 3, difficulty: 'medium', useRandomColor: false, memoryMode: false });
   const [votes, setVotes] = useState<Record<string, Vote>>({});
   const me = session.playerId;
 
@@ -303,6 +304,12 @@ function RoomView({ session, onLeave, room: { state, send, notFound } }: { sessi
                   <button key={p} onClick={() => setSettings({ ...settings, pack: p })} className={`flex-1 rounded-lg py-2 text-xs font-semibold capitalize ${(settings.pack ?? 'all') === p ? 'bg-pink-600' : 'bg-white/10'}`}>{p}</button>
                 ))}
               </div>
+              <div className="flex gap-2">
+                <button onClick={() => setSettings({ ...settings, seed: dailySeed(), roundCount: 3 })} className="flex-1 rounded-lg bg-white/10 py-2 text-xs font-semibold">Today's daily</button>
+                <button onClick={() => setSettings({ ...settings, seed: makeSeed() })} className="flex-1 rounded-lg bg-white/10 py-2 text-xs font-semibold">Challenge seed</button>
+                {settings.seed && <button onClick={() => setSettings({ ...settings, seed: undefined })} className="rounded-lg bg-white/10 px-3 py-2 text-xs">Clear</button>}
+              </div>
+              {settings.seed && <p className="text-center text-xs text-yellow-300">Challenge {settings.seed}: the same colours for everyone with this seed</p>}
             </div>
             <button onClick={() => send({ type: 'START', settings })} className={primary}>Start game</button>
           </>
