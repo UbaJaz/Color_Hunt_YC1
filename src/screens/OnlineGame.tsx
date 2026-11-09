@@ -5,7 +5,7 @@ import { CaptureScreen } from './CaptureScreen';
 import { CalibrationScreen } from './CalibrationScreen';
 import { ColorSwatch } from '../components/ui/ColorSwatch';
 import { acceptState, newIdentity, signIntent, signState, verifyIntent, type AuthRegistry, type Identity } from '../net/auth';
-import { createRoom, hostReduce, promoteHost, REACTIONS, successors, type Intent, type OnlineState } from '../net/host';
+import { createRoom, hostReduce, promoteHost, reclaimHost, REACTIONS, shouldReclaim, stamp, successors, type Intent, type OnlineState } from '../net/host';
 import { makeRoomCode, onlineConfigured, openRoom, type RoomConn } from '../net/room';
 import type { RGB } from '../types/color';
 import { PACKS, type GameSettings } from '../types/game';
@@ -25,6 +25,7 @@ interface Session {
   name: string;
   isHost: boolean;
   host: OnlineState | null; // the host's authoritative state, so a host refresh keeps the game
+  view?: OnlineState; // clients: the last snapshot accepted, so a refresh can still tell a real takeover from a forgery
   identity: Identity; // signing keypair, so nobody can act as this player
   hostPub?: JsonWebKey; // client: pinned host key
   auth?: AuthRegistry; // host: registered player keys and last-seen seq
@@ -49,7 +50,8 @@ const REJOIN_MS = 3 * 60 * 60 * 1000;
 export const loadRejoinOffer = (): Session | null => {
   try {
     const last = JSON.parse(localStorage.getItem(LAST_KEY) ?? 'null') as { session: Session; at: number } | null;
-    return last?.session?.identity && Date.now() - last.at < REJOIN_MS ? last.session : null;
+    // The saved snapshot is dropped: a rejoiner asks the live host for a fresh one (and sees "not found" if the room has ended).
+    return last?.session?.identity && Date.now() - last.at < REJOIN_MS ? { ...last.session, view: undefined } : null;
   } catch {
     return null;
   }
@@ -73,7 +75,7 @@ const shell = 'flex h-full w-full flex-col items-center overflow-y-auto bg-neutr
 const primary = 'rounded-full bg-pink-600 px-8 py-3 font-bold disabled:opacity-50';
 
 function useRoom(session: Session, onSession: (s: Session) => void) {
-  const [state, setState] = useState<OnlineState | null>(session.host);
+  const [state, setState] = useState<OnlineState | null>(session.host ?? session.view ?? null);
   const [notFound, setNotFound] = useState(false);
   const [hostGone, setHostGone] = useState(false);
   const lastSeen = useRef(Date.now());
@@ -97,13 +99,10 @@ function useRoom(session: Session, onSession: (s: Session) => void) {
   const broadcast = useCallback((s: OnlineState) => enqueue(async () => conn.current?.sendState(await signState(sess.current.identity, s))), [enqueue]);
 
   const apply = useCallback(
-    (from: string, intent: Intent, pub?: JsonWebKey) => {
+    (from: string, intent: Intent, pub?: JsonWebKey, seq?: number) => {
       if (!stateRef.current) return;
-      let next = hostReduce(stateRef.current, from, intent);
-      // Remember every member's public key in the state, so another player can take over if this host disappears.
-      if (pub && !next.keys?.[from] && (next.players.some(p => p.id === from) || next.spectators?.some(w => w.id === from))) {
-        next = { ...next, keys: { ...next.keys, [from]: pub } };
-      }
+      // The state also carries every member's public key and last seq, so another player can take over if this host disappears.
+      const next = stamp(hostReduce(stateRef.current, from, intent), from, pub, seq);
       stateRef.current = next;
       setState(next);
       persist({ host: next });
@@ -117,14 +116,14 @@ function useRoom(session: Session, onSession: (s: Session) => void) {
     const cur = stateRef.current;
     if (!cur || !cur.keys?.[sess.current.playerId]) return;
     const next = promoteHost(cur, sess.current.playerId);
-    const now = Date.now();
     const seqs: Record<string, number> = {};
-    for (const id of Object.keys(next.keys ?? {})) seqs[id] = observed.current.seqs[id] ?? -1; // never lower than what we saw
+    // Never lower than what the old host recorded or what we saw ourselves.
+    for (const id of Object.keys(next.keys ?? {})) seqs[id] = Math.max(next.seqs?.[id] ?? -1, observed.current.seqs[id] ?? -1);
     stateRef.current = next;
-    lastSeen.current = now;
+    lastSeen.current = Date.now();
     setState(next);
     setHostGone(false);
-    persist({ isHost: true, host: next, hostPub: undefined, auth: { keys: { ...next.keys }, seqs } });
+    persist({ isHost: true, host: next, view: undefined, hostPub: undefined, auth: { keys: { ...next.keys }, seqs } });
     broadcast(next);
   }, [persist, broadcast]);
 
@@ -141,16 +140,18 @@ function useRoom(session: Session, onSession: (s: Session) => void) {
       onIntent: env =>
         enqueue(async () => {
           if (!sess.current.isHost) {
-            // Not the host: only track signed seqs (against keys from the state) for a possible takeover.
-            observed.current.keys = { ...stateRef.current?.keys, ...observed.current.keys };
-            await verifyIntent(observed.current, env);
+            // Not the host: track signed seqs for a possible takeover, but only for members whose key came from the
+            // host's signed state. Ignoring everyone else means a forged JOIN cannot plant a seq for a real player.
+            const keys = stateRef.current?.keys;
+            if (!keys?.[env.from]) return;
+            await verifyIntent({ keys: { ...keys }, seqs: observed.current.seqs }, env);
             return;
           }
           const reg = sess.current.auth ?? { keys: {}, seqs: {} };
           const from = await verifyIntent(reg, env);
           if (!from) return;
           persist({ auth: reg });
-          apply(from, env.intent, env.pub);
+          apply(from, env.intent, env.pub, env.seq);
         }),
       onState: msg =>
         enqueue(async () => {
@@ -158,11 +159,23 @@ function useRoom(session: Session, onSession: (s: Session) => void) {
           const iAmHost = sess.current.isHost;
           const verdict = await acceptState(msg, cur, iAmHost ? sess.current.identity.pub : (sess.current.hostPub ?? null));
           if (!verdict) return;
-          if (iAmHost && verdict !== 'migrated') return; // our own echo
-          if (verdict === 'migrated') {
-            // Another player took over (or the old host's seat was filled while we were away): follow them.
-            persist({ isHost: false, host: null, hostPub: msg.pub, auth: undefined });
-          } else if (!sess.current.hostPub) persist({ hostPub: msg.pub });
+          const patch: Partial<Session> = {};
+          if (iAmHost) {
+            if (verdict !== 'migrated' || !cur) return; // our own echo
+            if (shouldReclaim(cur, msg.state)) {
+              // A player took over from a copy of the game older than ours (they missed our snapshots while we were alive):
+              // keep our newer game and move past their epoch so everyone follows us again.
+              const mine = reclaimHost(cur, msg.state);
+              stateRef.current = mine;
+              setState(mine);
+              persist({ host: mine });
+              broadcast(mine);
+              return;
+            }
+            // Another player really took over while we were away: follow them.
+            Object.assign(patch, { isHost: false, host: null, auth: undefined, hostPub: msg.pub });
+          } else if (verdict === 'migrated' || !sess.current.hostPub) patch.hostPub = msg.pub;
+          persist({ ...patch, view: msg.state });
           lastSeen.current = Date.now();
           setHostGone(false);
           stateRef.current = msg.state;
@@ -186,6 +199,10 @@ function useRoom(session: Session, onSession: (s: Session) => void) {
       const rank = successors(cur).indexOf(sess.current.playerId);
       if (rank >= 0 && idle > HOST_TIMEOUT_MS + rank * TAKEOVER_STAGGER_MS) promote();
     }, HEARTBEAT_MS);
+    const onVisible = () => {
+      if (!document.hidden) lastSeen.current = Date.now();
+    };
+    document.addEventListener('visibilitychange', onVisible);
     if (!session.isHost) {
       const hello = () => {
         if (stateRef.current) return clearInterval(timer);
@@ -201,6 +218,7 @@ function useRoom(session: Session, onSession: (s: Session) => void) {
     return () => {
       clearInterval(timer);
       clearInterval(beat);
+      document.removeEventListener('visibilitychange', onVisible);
       c.close();
       conn.current = null;
     };
@@ -303,8 +321,8 @@ function RoomView({ session, onLeave, room: { state, send, notFound } }: { sessi
     if (!state || state.phase !== 'final' || !state.players.some(p => p.id === me)) return;
     const key = `${state.code}:${state.game ?? 0}`;
     try {
-      if (sessionStorage.getItem(RECORDED_KEY) === key) return;
-      sessionStorage.setItem(RECORDED_KEY, key);
+      if (localStorage.getItem(RECORDED_KEY) === key) return;
+      localStorage.setItem(RECORDED_KEY, key);
     } catch {
       // storage blocked: fall through and record once per mount
     }

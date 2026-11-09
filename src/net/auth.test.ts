@@ -1,6 +1,6 @@
 // @vitest-environment node
 import { describe, expect, it } from 'vitest';
-import { createRoom, promoteHost, successors, type OnlineState } from './host';
+import { createRoom, promoteHost, reclaimHost, shouldReclaim, stamp, successors, type OnlineState } from './host';
 import { acceptState, newIdentity, signIntent, signState, verifyIntent, verifyState, type AuthRegistry, type Identity } from './auth';
 
 const reg = (): AuthRegistry => ({ keys: {}, seqs: {} });
@@ -47,15 +47,15 @@ describe('signed state', () => {
   });
 });
 
-describe('host migration', () => {
-  /** A room of host h plus players a and b, with everyone's public key stored in the state. */
-  async function room() {
-    const ids: Record<string, Identity> = { h: await newIdentity(), a: await newIdentity(), b: await newIdentity() };
-    let state: OnlineState = createRoom('ABCD', 'h', 'Host', ids.h.pub);
-    state = { ...state, players: [...state.players, { id: 'a', name: 'Ann', totalScore: 0 }, { id: 'b', name: 'Bob', totalScore: 0 }], keys: { h: ids.h.pub, a: ids.a.pub, b: ids.b.pub } };
-    return { ids, state };
-  }
+/** A room of host h plus players a and b, with everyone's public key stored in the state. */
+async function room() {
+  const ids: Record<string, Identity> = { h: await newIdentity(), a: await newIdentity(), b: await newIdentity() };
+  let state: OnlineState = createRoom('ABCD', 'h', 'Host', ids.h.pub);
+  state = { ...state, players: [...state.players, { id: 'a', name: 'Ann', totalScore: 0 }, { id: 'b', name: 'Bob', totalScore: 0 }], keys: { h: ids.h.pub, a: ids.a.pub, b: ids.b.pub } };
+  return { ids, state };
+}
 
+describe('host migration', () => {
   it('lists successors in join order and bumps the epoch when someone takes over', async () => {
     const { state } = await room();
     expect(successors(state)).toEqual(['a', 'b']);
@@ -95,5 +95,34 @@ describe('host migration', () => {
     expect(await acceptState(await signState(ids.a, byA), byB, ids.b.pub)).toBe('migrated');
     // ...but someone who followed a does not switch to b.
     expect(await acceptState(await signState(ids.b, byB), byA, ids.a.pub)).toBe(false);
+  });
+});
+
+describe('takeover bookkeeping', () => {
+  it('stamps the sender key once, the latest seq and a rising revision', async () => {
+    const { ids, state } = await room();
+    const joined = stamp({ ...state, keys: { h: ids.h.pub } }, 'a', ids.a.pub, 5);
+    expect(joined.keys!.a).toEqual(ids.a.pub);
+    expect(joined.seqs).toEqual({ a: 5 });
+    expect(joined.rev).toBe(1);
+    const again = stamp(joined, 'a', (await newIdentity()).pub, 9); // a later JOIN can not swap the stored key
+    expect(again.keys!.a).toEqual(ids.a.pub);
+    expect(again.seqs).toEqual({ a: 9 });
+    expect(again.rev).toBe(2);
+    expect(stamp(state, 'stranger', ids.a.pub, 99).seqs).toBeUndefined(); // non-members leave no trace
+  });
+
+  it('lets a live host with a newer game keep the room from a stale claimant', async () => {
+    const { ids, state } = await room();
+    const live = { ...state, rev: 7, epoch: 0 };
+    const stale = promoteHost({ ...state, rev: 4 }, 'a');
+    expect(shouldReclaim(live, stale)).toBe(true);
+    const mine = reclaimHost(live, stale);
+    expect(mine).toMatchObject({ hostId: 'h', epoch: 2, rev: 7 });
+    // clients that followed the stale claimant accept the live host again, and the claimant itself yields
+    expect(await acceptState(await signState(ids.h, mine), stale, ids.a.pub)).toBe('migrated');
+    expect(shouldReclaim(stale, mine)).toBe(false);
+    // an up-to-date claimant (same revision) is not overruled
+    expect(shouldReclaim({ ...state, rev: 4 }, promoteHost({ ...state, rev: 4 }, 'a'))).toBe(false);
   });
 });

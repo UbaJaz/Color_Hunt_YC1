@@ -133,7 +133,7 @@ The following items were intentionally deferred and are not silently dropped:
 - **Cross-device / cross-lighting condition testing** — synthetic and 3-JPEG test data only. No testing across different ambient light conditions, phone cameras, or capture distances yet.
 - **5+ person friend testing session** — no live player testing done. The rarity and scoring thresholds are calibrated from lab data only.
 - **iOS `navigator.vibrate()`** — not supported in Safari/iOS, so vibration cues do nothing there (sound still works).
-- **Host migration limits** — if the host disappears, the next player to have joined takes over after about 15 seconds, keeping scores and phase (the last snapshot is at most 5 seconds old). Any room member can claim the host role (same trust as the room code), and a flaky client that stops hearing the host can briefly pull the room away from a live host; the earlier-joined claimant wins ties.
+- **Host migration limits** — if the host disappears, the next player to have joined takes over after about 15 seconds, keeping scores and phase (the last snapshot is at most 5 seconds old). Any room member can claim the host role (same trust as the room code), a client that merely missed snapshots can claim the room from a live host, but the live host notices its own copy is newer and takes the room back (a client that wakes from the background waits another 15 seconds before judging the host dead). Two equal claims are settled in favour of the earlier-joined player.
 - **Real-phone checks** — camera, white-balance lock, share sheet, photo-upload fallback and PWA install have not been verified on physical devices.
 - **Rarity chroma-only separation** — see Known Limitations above.
 

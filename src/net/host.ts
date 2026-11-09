@@ -36,6 +36,10 @@ export interface OnlineState {
   epoch?: number;
   /** Every member's public signing key. Kept in the state so a successor can verify players after the host is gone. */
   keys?: Record<string, JsonWebKey>;
+  /** Highest accepted intent seq per player. Stored here so a successor refuses replays of anything older. */
+  seqs?: Record<string, number>;
+  /** Counts host-side changes. Lets a live host tell that someone took over from an out-of-date copy of its game. */
+  rev?: number;
 }
 
 /** What a client may ask for. Scores are never sent: the host derives them from the colour. */
@@ -195,3 +199,20 @@ export function hostReduce(state: OnlineState, from: string, intent: Intent, pic
       return state;
   }
 }
+
+/**
+ * Bookkeeping the host does after reducing an intent: remember the sender's public key (first JOIN), their latest
+ * accepted seq, and bump the revision. Kept pure so it can be tested without React.
+ */
+export function stamp(next: OnlineState, from: string, pub?: JsonWebKey, seq?: number): OnlineState {
+  const member = next.players.some(p => p.id === from) || !!next.spectators?.some(w => w.id === from);
+  const keys = pub && member && !next.keys?.[from] ? { ...next.keys, [from]: pub } : next.keys;
+  const seqs = seq != null && member ? { ...next.seqs, [from]: seq } : next.seqs;
+  return { ...next, keys, seqs, rev: (next.rev ?? 0) + 1 };
+}
+
+/** Someone claimed the host role from a copy of the game older than ours: we are still here, so we keep it. */
+export const shouldReclaim = (mine: OnlineState, theirs: OnlineState) => (mine.rev ?? 0) > (theirs.rev ?? 0);
+
+/** Keep our newer game but move past the claimant's epoch so every client accepts us again. */
+export const reclaimHost = (mine: OnlineState, theirs: OnlineState): OnlineState => ({ ...mine, epoch: Math.max(mine.epoch ?? 0, theirs.epoch ?? 0) + 1 });

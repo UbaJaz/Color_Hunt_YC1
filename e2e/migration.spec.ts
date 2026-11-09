@@ -46,3 +46,27 @@ test('when the host disappears the next player takes over, and the old host can 
   await expect(back.getByText('Start next round')).toHaveCount(0);
   await expect(guest.getByRole('heading', { name: 'Cast your votes' })).toBeVisible(); // guest is still the host and was not demoted
 });
+
+test('a player who refreshes while the host is gone still takes over (the last snapshot survives the reload)', async ({ browser }) => {
+  const host = await (await browser.newContext()).newPage();
+  const guest = await (await browser.newContext()).newPage();
+
+  await host.goto('/');
+  await host.getByRole('button', { name: 'Play online with friends' }).click();
+  await host.getByLabel('Your name').fill('Hosty');
+  await host.getByRole('button', { name: 'Create room' }).click();
+  const code = (await host.locator('h1').first().innerText()).trim();
+
+  await guest.goto('/');
+  await guest.getByRole('button', { name: 'Play online with friends' }).click();
+  await guest.getByLabel('Your name').fill('Guesty');
+  await guest.getByLabel('Room code').fill(code);
+  await guest.getByRole('button', { name: 'Join room' }).click();
+  await expect(guest.getByText('Waiting for the host')).toBeVisible({ timeout: 20_000 });
+
+  await host.close();
+  await guest.reload();
+  await expect(guest.getByText('Waiting for the host')).toBeVisible(); // restored from the saved snapshot, not "room not found"
+  await expect(guest.getByRole('status')).toContainText('You are now the host', { timeout: 40_000 });
+  await expect(guest.getByRole('button', { name: 'Start game' })).toBeVisible();
+});
