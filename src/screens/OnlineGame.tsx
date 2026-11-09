@@ -313,7 +313,7 @@ function RoomView({ session, onLeave, room: { state, send, notFound } }: { sessi
                 ))}
               </div>
               <div className="flex gap-2">
-                <button onClick={() => setSettings({ ...settings, seed: dailySeed(), roundCount: 3 })} className="flex-1 rounded-lg bg-white/10 py-2 text-xs font-semibold">Today's daily</button>
+                <button onClick={() => setSettings({ roundCount: 3, difficulty: 'medium', useRandomColor: false, memoryMode: false, seed: dailySeed() })} className="flex-1 rounded-lg bg-white/10 py-2 text-xs font-semibold">Today's daily</button>
                 <button onClick={() => setSettings({ ...settings, seed: makeSeed() })} className="flex-1 rounded-lg bg-white/10 py-2 text-xs font-semibold">Challenge seed</button>
                 {settings.seed && <button onClick={() => setSettings({ ...settings, seed: undefined })} className="rounded-lg bg-white/10 px-3 py-2 text-xs">Clear</button>}
               </div>
