@@ -30,6 +30,7 @@ export function LobbyScreen({ onStartGame, onPlayOnline }: LobbyScreenProps) {
   const [useRandomColor, setUseRandomColor] = useState(challenge?.useRandomColor ?? false);
   const [memoryMode, setMemoryMode] = useState(challenge?.memoryMode ?? false);
   const [themes, setThemes] = useState(challenge?.themes ?? false);
+  const [twoColor, setTwoColor] = useState(challenge?.twoColor ?? false);
   const [pack, setPack] = useState<Pack>(challenge?.pack ?? 'all');
   const [seed, setSeed] = useState(challenge?.seed);
   const [copied, setCopied] = useState(false);
@@ -37,7 +38,7 @@ export function LobbyScreen({ onStartGame, onPlayOnline }: LobbyScreenProps) {
   const copyChallenge = () => {
     const s = seed ?? makeSeed();
     setSeed(s);
-    void navigator.clipboard?.writeText(buildChallengeUrl(window.location.origin + window.location.pathname, { seed: s, roundCount, difficulty, useRandomColor, memoryMode, themes, pack }));
+    void navigator.clipboard?.writeText(buildChallengeUrl(window.location.origin + window.location.pathname, { seed: s, roundCount, difficulty, useRandomColor, memoryMode, themes, twoColor, pack }));
     setCopied(true);
   };
 
@@ -53,7 +54,7 @@ export function LobbyScreen({ onStartGame, onPlayOnline }: LobbyScreenProps) {
 
   const handleStart = () => {
     if (state.players.length === 0) return;
-    onStartGame({ roundCount, difficulty, useRandomColor, memoryMode, themes, pack, seed });
+    onStartGame({ roundCount, difficulty, useRandomColor, memoryMode, themes, twoColor, pack, seed });
   };
 
   const today = dailySeed();
@@ -154,6 +155,21 @@ export function LobbyScreen({ onStartGame, onPlayOnline }: LobbyScreenProps) {
                 memoryMode ? 'translate-x-5' : 'translate-x-0'
               }`}
             />
+          </button>
+        </div>
+
+        {/* Two-colour rounds */}
+        <div className="mb-5 flex items-center justify-between rounded-lg bg-white/5 px-4 py-3">
+          <div>
+            <p className="text-sm font-medium">Two-Colour Rounds</p>
+            <p className="text-xs text-neutral-400">Find a warm and a cool object (60s)</p>
+          </div>
+          <button
+            onClick={() => setTwoColor(v => !v)}
+            aria-label="Two-colour rounds"
+            className={`relative h-6 w-11 rounded-full transition-colors ${twoColor ? 'bg-pink-600' : 'bg-neutral-700'}`}
+          >
+            <span className={`absolute top-0.5 left-0.5 h-5 w-5 rounded-full bg-white transition-transform ${twoColor ? 'translate-x-5' : 'translate-x-0'}`} />
           </button>
         </div>
 

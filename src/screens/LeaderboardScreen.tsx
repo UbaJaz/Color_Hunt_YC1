@@ -19,7 +19,7 @@ export function LeaderboardScreen({ onNextRound }: { onNextRound: () => void }) 
       <div className="w-full max-w-sm flex flex-col gap-8">
         <div className="flex flex-col items-center gap-3">
           <h2 className="text-sm uppercase tracking-wider text-neutral-400 text-center">Round {currentRound.roundNumber} Results</h2>
-          <RoundReveal target={currentRound.targetColor} results={currentRound.results} nameOf={id => state.players.find(p => p.id === id)?.name ?? '?'} />
+          <RoundReveal target={currentRound.targetColor} target2={currentRound.targetColor2} results={currentRound.results} nameOf={id => state.players.find(p => p.id === id)?.name ?? '?'} />
         </div>
 
         <div>

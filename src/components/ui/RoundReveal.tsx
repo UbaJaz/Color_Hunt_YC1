@@ -7,40 +7,52 @@ const hex = ({ r, g, b }: RGB) => '#' + [r, g, b].map(n => n.toString(16).padSta
 
 interface RoundRevealProps {
   target: TargetColor;
+  /** Two-colour rounds: the cool colour. */
+  target2?: TargetColor;
   results: RoundResult[];
   nameOf: (playerId: string) => string;
 }
 
-/** After voting: the target next to every player's pick, with how close it was and where the points came from. */
-export function RoundReveal({ target, results, nameOf }: RoundRevealProps) {
+function Swatch({ rgb, label }: { rgb: RGB | null; label: string }) {
+  return (
+    <span
+      className="h-12 w-12 shrink-0 rounded-xl border border-white/20 bg-neutral-800"
+      style={rgb ? { background: hex(rgb) } : undefined}
+      role="img"
+      aria-label={rgb ? `${label} ${hex(rgb)}` : `${label}: no capture`}
+    />
+  );
+}
+
+/** After voting: the target(s) next to every player's pick(s), with how close it was and where the points came from. */
+export function RoundReveal({ target, target2, results, nameOf }: RoundRevealProps) {
   const sorted = [...results].sort((a, b) => (b.finalScore ?? 0) - (a.finalScore ?? 0));
+  const targets = target2 ? [target, target2] : [target];
   return (
     <div className="flex w-full max-w-sm flex-col gap-3">
       <div className="flex items-center gap-3 rounded-xl bg-white/10 p-3">
-        <span className="h-12 w-12 rounded-xl border border-white/20" style={{ background: target.hex }} />
+        {targets.map(t => <Swatch key={t.id} rgb={t.rgb} label={`Target ${t.name}`} />)}
         <span>
-          <span className="block text-xs uppercase tracking-wide text-neutral-400">Target</span>
-          <span className="font-semibold">{target.name}</span>
-          <span className="ml-2 text-xs text-neutral-400">{target.hex.toUpperCase()}</span>
+          <span className="block text-xs uppercase tracking-wide text-neutral-400">{target2 ? 'Targets' : 'Target'}</span>
+          <span className="font-semibold">{targets.map(t => t.name).join(' + ')}</span>
+          <span className="ml-2 text-xs text-neutral-400">{targets.map(t => t.hex.toUpperCase()).join(' ')}</span>
         </span>
       </div>
       {sorted.map((r, i) => {
         const vote = r.bonusVotes ? calculateVoteBonus(r.bonusVotes) : 0;
         const precise = precisionBonus(r.deltaE);
         const streak = streakBonus(r.streak ?? 0);
+        const picks = r.pair ? r.pair.map(p => p.extractedRgb) : [r.extractedRgb];
         return (
           <div key={r.playerId} className="flex items-center justify-between rounded-xl bg-white/5 p-3">
             <span className="flex items-center gap-3">
-              <span
-                className="h-12 w-12 rounded-xl border border-white/20 bg-neutral-800"
-                style={r.extractedRgb ? { background: hex(r.extractedRgb) } : undefined}
-                role="img"
-                aria-label={r.extractedRgb ? `${nameOf(r.playerId)} picked ${hex(r.extractedRgb)}` : `${nameOf(r.playerId)} had no capture`}
-              />
+              <span className="flex gap-1">
+                {picks.map((rgb, k) => <Swatch key={k} rgb={rgb} label={`${nameOf(r.playerId)} picked`} />)}
+              </span>
               <span>
                 <span className="block font-medium">{i === 0 && '👑 '}{nameOf(r.playerId)}</span>
                 <span className="block text-xs text-neutral-400">
-                  {r.extractedRgb ? `${hex(r.extractedRgb)} · ΔE ${r.deltaE?.toFixed(1)}` : 'No capture'}
+                  {r.extractedRgb ? `${picks.map(p => (p ? hex(p) : 'none')).join(' ')}${r.deltaE != null ? ` · ΔE ${r.deltaE.toFixed(1)}` : ''}` : 'No capture'}
                 </span>
               </span>
             </span>

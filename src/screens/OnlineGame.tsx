@@ -1,6 +1,5 @@
 import { RoundReveal } from '../components/ui/RoundReveal';
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { deltaE2000, deltaEToMatchScore, rgbToLab } from '@color-science';
 import { useGameState } from '../state/GameStateContext';
 import { CaptureScreen } from './CaptureScreen';
 import { CalibrationScreen } from './CalibrationScreen';
@@ -12,6 +11,7 @@ import type { RGB } from '../types/color';
 import { PACKS, type GameSettings } from '../types/game';
 import type { Vote } from '../utils/voting';
 import { shareResults } from '../utils/shareCard';
+import { combineParts, scorePart } from '../utils/pair';
 import { dailySeed, makeSeed, parseChallenge } from '../utils/challenge';
 
 /** Per-tab (sessionStorage) so two tabs are two players, and a refresh rejoins the same seat. */
@@ -223,7 +223,7 @@ function Room({ session, onSession, onLeave }: { session: Session; onSession: (s
 function RoomView({ session, onLeave, room: { state, send, notFound } }: { session: Session; onLeave: () => void; room: ReturnType<typeof useRoom> }) {
   const { state: local } = useGameState();
   const [calDone, setCalDone] = useState(false);
-  const [pending, setPending] = useState<{ round: number; rgb: RGB } | null>(null); // a confirmed capture awaiting Submit or Retake
+  const [pending, setPending] = useState<{ round: number; rgb: RGB; rgb2: RGB | null } | null>(null); // a confirmed capture awaiting Submit or Retake
   const [retakes, setRetakes] = useState({ round: 0, n: 0 });
   const [settings, setSettings] = useState<GameSettings>(() => parseChallenge(window.location.search) ?? { roundCount: 3, difficulty: 'medium', useRandomColor: false, memoryMode: false });
   const [votes, setVotes] = useState<Record<string, Vote>>({});
@@ -251,7 +251,7 @@ function RoomView({ session, onLeave, room: { state, send, notFound } }: { sessi
             {watchRound.theme && <p className="text-sm text-yellow-300">{watchRound.theme}</p>}
           </>
         )}
-        {watchRound && state.phase === 'leaderboard' && <RoundReveal target={watchRound.targetColor} results={watchRound.results} nameOf={watchName} />}
+        {watchRound && state.phase === 'leaderboard' && <RoundReveal target={watchRound.targetColor} target2={watchRound.targetColor2} results={watchRound.results} nameOf={watchName} />}
         <Standings state={state} />
         <button onClick={onLeave} className="text-sm text-neutral-400 underline">Leave</button>
       </div>
@@ -275,7 +275,7 @@ function RoomView({ session, onLeave, room: { state, send, notFound } }: { sessi
   );
 
   if (state.phase === 'lobby') {
-    const toggle = (label: string, key: 'memoryMode' | 'useRandomColor' | 'themes') => (
+    const toggle = (label: string, key: 'memoryMode' | 'useRandomColor' | 'themes' | 'twoColor') => (
       <label className="flex items-center justify-between rounded-lg bg-white/5 px-4 py-3 text-sm">
         {label}
         <input type="checkbox" checked={!!settings[key]} onChange={e => setSettings({ ...settings, [key]: e.target.checked })} />
@@ -299,6 +299,7 @@ function RoomView({ session, onLeave, room: { state, send, notFound } }: { sessi
               {toggle('Random colours', 'useRandomColor')}
               {toggle('Memory mode', 'memoryMode')}
               {toggle('Theme prompts', 'themes')}
+              {toggle('Two-colour rounds (warm + cool)', 'twoColor')}
               <div className="flex gap-2">
                 {PACKS.map(p => (
                   <button key={p} onClick={() => setSettings({ ...settings, pack: p })} className={`flex-1 rounded-lg py-2 text-xs font-semibold capitalize ${(settings.pack ?? 'all') === p ? 'bg-pink-600' : 'bg-white/10'}`}>{p}</button>
@@ -336,7 +337,8 @@ function RoomView({ session, onLeave, room: { state, send, notFound } }: { sessi
     if (!calDone && !local.calibrationMatrix) return <CalibrationScreen onCalibrationComplete={() => setCalDone(true)} />;
     const retakesUsed = retakes.round === round.roundNumber ? retakes.n : 0;
     if (pending?.round === round.roundNumber) {
-      const score = Math.round(deltaEToMatchScore(deltaE2000(rgbToLab(pending.rgb), rgbToLab(round.targetColor.rgb))));
+      const first = scorePart(pending.rgb, round.targetColor.rgb);
+      const score = Math.round(round.targetColor2 ? combineParts([first, scorePart(pending.rgb2, round.targetColor2.rgb)]).score ?? 0 : first.score);
       const left = MAX_RETAKES - retakesUsed;
       return (
         <div className={`${shell} justify-center text-center`}>
@@ -345,8 +347,14 @@ function RoomView({ session, onLeave, room: { state, send, notFound } }: { sessi
             <ColorSwatch hex={round.targetColor.hex} label="Target" />
             <ColorSwatch hex={hex(pending.rgb)} label="You" />
           </div>
+          {round.targetColor2 && (
+            <div className="flex gap-6">
+              <ColorSwatch hex={round.targetColor2.hex} label="Target 2" />
+              {pending.rgb2 ? <ColorSwatch hex={hex(pending.rgb2)} label="You" /> : <p className="self-center text-sm text-neutral-400">No second capture</p>}
+            </div>
+          )}
           <p className="text-2xl font-bold">Score {score}</p>
-          <button onClick={() => send({ type: 'SUBMIT', extractedRgb: pending.rgb })} className={primary}>Submit</button>
+          <button onClick={() => send({ type: 'SUBMIT', extractedRgb: pending.rgb, extractedRgb2: pending.rgb2 })} className={primary}>Submit</button>
           <button
             disabled={left <= 0}
             onClick={() => { setPending(null); setRetakes({ round: round.roundNumber, n: retakesUsed + 1 }); }}
@@ -363,11 +371,12 @@ function RoomView({ session, onLeave, room: { state, send, notFound } }: { sessi
         onRoundResultReady={() => {}}
         online={{
           targetColor: round.targetColor,
+          targetColor2: round.targetColor2,
           roundNumber: round.roundNumber,
           theme: round.theme,
           playerName: nameOf(me),
           memoryMode: !!state.settings?.memoryMode,
-          onSubmit: rgb => (rgb ? setPending({ round: round.roundNumber, rgb }) : send({ type: 'SUBMIT', extractedRgb: null })),
+          onSubmit: (rgb, rgb2) => (rgb ? setPending({ round: round.roundNumber, rgb, rgb2: rgb2 ?? null }) : send({ type: 'SUBMIT', extractedRgb: null })),
         }}
       />
     );
@@ -390,7 +399,10 @@ function RoomView({ session, onLeave, room: { state, send, notFound } }: { sessi
         {targets.map(r => (
           <div key={r.playerId} className="flex w-full max-w-sm flex-col items-center gap-4 rounded-2xl bg-white/10 p-4">
             <h2 className="text-lg font-semibold">{nameOf(r.playerId)}'s Object</h2>
-            <ColorSwatch hex={hex(r.extractedRgb!)} label="Extracted" />
+            <div className="flex gap-4">
+              <ColorSwatch hex={hex(r.extractedRgb!)} label="Extracted" />
+              {r.pair?.[1]?.extractedRgb && <ColorSwatch hex={hex(r.pair[1].extractedRgb)} label="Second" />}
+            </div>
             <div className="flex gap-4">
               {(['up', 'down'] as const).map(v => (
                 <button key={v} onClick={() => setVotes({ ...votes, [r.playerId]: v })} className={`rounded-full px-6 py-2 font-bold ${votes[r.playerId] === v ? (v === 'up' ? 'bg-green-500' : 'bg-red-500') : 'bg-neutral-800 text-neutral-400'}`}>
@@ -409,7 +421,7 @@ function RoomView({ session, onLeave, room: { state, send, notFound } }: { sessi
     return (
       <div className={shell}>
         <h1 className="text-3xl font-bold text-yellow-400">Round {round.roundNumber} results</h1>
-        <RoundReveal target={round.targetColor} results={round.results} nameOf={nameOf} />
+        <RoundReveal target={round.targetColor} target2={round.targetColor2} results={round.results} nameOf={nameOf} />
         <h2 className="text-sm uppercase tracking-wider text-neutral-400">Total score</h2>
         <Standings state={state} />
         {isHost ? (

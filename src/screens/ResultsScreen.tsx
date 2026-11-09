@@ -115,10 +115,25 @@ export function ResultsScreen({ onContinue, onRetake, retakesLeft }: ResultsScre
         )}
       </div>
 
+      {currentRound.targetColor2 && result.pair && (
+        <div className="flex flex-col items-center gap-2">
+          <p className="text-xs uppercase tracking-wide text-neutral-400">Cool colour · {Math.round(result.pair[1].score)} / 100</p>
+          <div className="flex items-center gap-6">
+            <ColorSwatch hex={currentRound.targetColor2.hex} label="Target" sublabel={currentRound.targetColor2.name} />
+            <span className="text-2xl text-neutral-500">vs</span>
+            {result.pair[1].extractedRgb ? (
+              <ColorSwatch hex={rgbToHex(result.pair[1].extractedRgb)} label="Your pick" sublabel={rgbToHex(result.pair[1].extractedRgb)} />
+            ) : (
+              <div className="flex h-24 w-24 items-center justify-center rounded-2xl border border-dashed border-white/30 text-center text-xs text-neutral-500">No capture</div>
+            )}
+          </div>
+        </div>
+      )}
+
       <div className="flex w-full max-w-sm flex-col gap-4">
         <div className="flex gap-4 rounded-2xl bg-white/5 px-6 py-4 justify-around">
           <div className="text-center">
-            <p className="text-xs uppercase tracking-wide text-neutral-400">{result.score != null ? scoreLabel(result.score) : 'Score'}</p>
+            <p className="text-xs uppercase tracking-wide text-neutral-400">{result.score != null ? scoreLabel(result.score) : 'Score'}{result.pair && ' (average)'}</p>
             <p className="text-xl font-semibold text-pink-400">
               {result.score != null ? `${Math.round(result.score)}` : '—'}<span className="text-xs text-neutral-400"> / 100</span>
             </p>

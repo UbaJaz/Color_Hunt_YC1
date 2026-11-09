@@ -7,6 +7,8 @@ interface TargetColorBannerProps {
   roundNumber: number;
   /** Optional hunting-ground prompt for this round. */
   theme?: string;
+  /** Two-colour rounds: which of the two colours this is. */
+  part?: string;
   /** Memory mode: hide the swatch after this many ms. */
   hideSwatchAfterMs?: number;
 }
@@ -20,7 +22,7 @@ const DIFFICULTY_BADGE: Record<string, string> = {
 /** Shows the color the player needs to find, overlaid on the camera view.
  *  Day 6b: includes a difficulty badge so players immediately know how hard
  *  the round is before they start hunting. */
-export function TargetColorBanner({ targetColor, roundNumber, theme, hideSwatchAfterMs }: TargetColorBannerProps) {
+export function TargetColorBanner({ targetColor, roundNumber, theme, part, hideSwatchAfterMs }: TargetColorBannerProps) {
   const [hidden, setHidden] = useState(false);
   useEffect(() => {
     if (!hideSwatchAfterMs) return;
@@ -32,7 +34,7 @@ export function TargetColorBanner({ targetColor, roundNumber, theme, hideSwatchA
     <div className="absolute inset-x-0 top-0 z-10 flex items-center justify-between gap-3 bg-black/60 px-4 py-3 backdrop-blur-sm">
       <div>
         <div className="flex items-center gap-2">
-          <p className="text-xs uppercase tracking-wide text-neutral-400">Round {roundNumber} · Find</p>
+          <p className="text-xs uppercase tracking-wide text-neutral-400">Round {roundNumber} · Find{part && ` ${part}`}</p>
           {targetColor.difficulty && (
             <span className="text-xs rounded-full bg-white/10 px-2 py-0.5 text-neutral-300">
               {DIFFICULTY_BADGE[targetColor.difficulty] ?? targetColor.difficulty}
